@@ -19,7 +19,7 @@ The main command `choicellm` takes a plaintext file as argument and some options
 A minimal way of running the command is as follows:
 
 ```bash
-$ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode scalar > results.csv
+choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode scalar > results.csv
 ```
 
 This asks the specified language model (from Huggingface) to rate all the items in `items.txt` (one per line) on a scale from 1-5 representing levels of 'concreteness': how concrete (vs. abstract) is a given word or phrase.
@@ -27,25 +27,25 @@ This asks the specified language model (from Huggingface) to rate all the items 
 Instead of asking the model to rate items on a scale (`--mode scalar`), we can ask it to choose one of several categories: `--mode categorical`. In this case, the default behavior (see below how to specify custom prompts) is for the model to choose, for each item, between 'concrete', 'neutral' and 'abstract'.
 
 ```bash
-$ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode categorical > results.csv
+choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode categorical > results.csv
 ```
 
 Finally, we can set `--mode comparative` to ask the model to compare each item to a large number of random other items, which can result in more reliable per-item scores (once aggregated over all comparisons).
 
 ```bash
-$ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode comparative > results.csv
+choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode comparative > results.csv
 ```
 
 In this case, the `results.csv` file will not contain a single score per item, but rather a separate row for each comparison it did. The auxiliary command `choicellm_aggregate` may be used to aggregate these comparisons into a single score per item (in this case resulting in values on the scale 1,5):
 
 ```bash
-$ choicellm_aggregate results.csv --scale 1,5 > results_aggregated.csv
+choicellm_aggregate results.csv --scale 1,5 > results_aggregated.csv
 ```
 
 To see some other options with rather minimal explanations, do `choicellm --help`. To illustrate some of those, to prompt OpenAI's `gpt-4o` for concreteness scores in `comparative` mode, you could do (and don't forget to aggregate the results afterwards with `choicellm_aggregate`):
 
 ```bash
-$ choicellm items.txt --model "gpt-4o" --openai --labels A B C --n_choices 3 --n_comparisons 50 --mode comparative > results.csv
+choicellm items.txt --model "gpt-4o" --openai --labels A B C --n_choices 3 --n_comparisons 50 --mode comparative > results.csv
 ```
 
 (Though for a chat model like `gpt-4o`, as opposed to a base model like `unsloth/llama-3-70b-bnb-4bit`, it might be better to use a custom prompt, see below.)
@@ -61,13 +61,13 @@ The default prompt, and also the elements of a `.json` file for a custom prompt,
 An example with a custom prompt (say, for sentiment analysis) would be as follows -- assuming you have the relevant prompt specification in a file `sentiment.json`: 
 
 ```bash
-$ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --mode scalar > results.csv
+choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --mode scalar > results.csv
 ```
 
 You can also specify which scale to use, with `--labels`, as follows. Since this is a three-point scale, your few-shot examples in the `.json` specification of the prompt should use 0 as minimum and 2 as maximum response value.
 
 ```bash
-$ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --labels -1 0 1 --mode scalar > results.csv
+choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --labels -1 0 1 --mode scalar > results.csv
 ```
 
 ## Which models to use?
@@ -83,6 +83,6 @@ Note that the default prompts were designed for base models, not instruct/chat m
 Here's an example that asks `gpt-4o` to assign to each plaintext headline (say) from `headlines.txt` the most applicable topic (from some predefined list given in the custom prompt `topics.json`, assuming it exists). 
 
 ```bash
-$ choicellm headlines.txt --model "gpt-4o" --openai --prompt topics.json --mode categorical > results.csv 2> raw_llm_output.log
+choicellm headlines.txt --model "gpt-4o" --openai --prompt topics.json --mode categorical > results.csv 2> raw_llm_output.log
 ```
 
