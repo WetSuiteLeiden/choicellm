@@ -133,7 +133,7 @@ class PromptTemplate:
             categories: dict,
             labels: list[str]
     ) -> tuple[str, list[tuple[str, str]], str]:
-        categories_full = '\n'.join(f'{l}. {c.capitalize()}: {d}' for l, (c, d) in zip(labels, categories.items()))
+        categories_full = '\n'.join(f'{l}. {c}: {d}' for l, (c, d) in zip(labels, categories.items()))
         category_names = list(categories.keys())
         system_prompt = system_prompt.format(categories=categories_full)
         examples_list = []
