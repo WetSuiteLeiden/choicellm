@@ -51,6 +51,8 @@ def main():
 
     args = argparser.parse_args()
 
+    # TODO: Implement multi-label classification? one-versus-rest classification?
+
     # For backwards compatibility:
     if args.comparative:
         logging.warning('Don\'t use --comparative; kept for backwards compatibility only. Use --mode comparative instead.')
@@ -139,7 +141,7 @@ def get_weighted_sum(scores: list[float], scale: list[int | float]) -> float:
 
 def iter_items_basic(lines: list[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
 
-    for n, line in tqdm(enumerate(lines), total=len(lines)):
+    for n, line in tqdm(enumerate(lines), total=len(lines)):    # TODO Remove progress bars?!
         prompt = prompt_template.format(line)
         yield {'target_id': n, 'target': line, 'prompt': prompt}
 
