@@ -68,7 +68,7 @@ class MultipleChoiceModel:
             logprobs=True,
             top_logprobs=10,
             logit_bias={l: LOGIT_BIAS for l in label_ids},
-            max_completion_tokens=20,
+            max_completion_tokens=10,
         )
 
         label_logprobs = {}
