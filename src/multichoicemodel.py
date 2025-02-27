@@ -21,9 +21,10 @@ class MultipleChoiceModel:
     def __init__(self, model_name, labels, model_is_chat, prompt_start_for_cache=None, client=None):
 
         if client and model_is_chat:    # assuming openai gpt
-            tokenizer = tiktoken.encoding_for_model(model_name)
+            tokenizer = tiktoken.encoding_for_model('gpt-4o' if model_name.startswith('o1') else model_name)    # TODO meh
             label_ids = [tokenizer.encode(label)[0] for label in labels]    # TODO verify they are all singleton ids
             logging.info(f'Using label ids: {label_ids}')
+            # TODO: For o1 model, logprobs not supported; so consider disabling the logprobs and just getting the output directly?
             self.get_scores = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=client, labels=labels, label_ids=label_ids)
         else:
             model = transformers.AutoModelForCausalLM.from_pretrained(model_name, max_length=200)  # TODO Check length adequacy
