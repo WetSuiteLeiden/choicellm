@@ -96,7 +96,7 @@ def main():
     if args.mode == 'comparative':
         compare_to = list(line.strip() for line in args.compare_to) if args.compare_to is not None else input_lines
         n_comparisons = args.n_choices * args.n_comparisons
-        assert len(compare_to) >= n_comparisons, f'Not enough items for {n_comparisons} comparisons! Decrease n_alternatives or n_comparisons.'
+        assert len(compare_to) >= n_comparisons + 1, f'Not enough items for {n_comparisons} comparisons! Decrease n_alternatives or n_comparisons.'
         items = iter_items_comparison(input_lines, args.n_choices, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
         fieldnames = ['target_id', 'comparison_id', 'position', 'target', 'result', 'choices', 'proba']
         process_result = get_score_at_position
