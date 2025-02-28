@@ -27,12 +27,12 @@ class MultipleChoiceModel:
             # TODO: For o1 model, logprobs not supported; so consider disabling the logprobs and just getting the output directly?
             self.get_scores = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=client, labels=labels, label_ids=label_ids)
         else:
-            model = transformers.AutoModelForCausalLM.from_pretrained(model_name, max_length=200)  # TODO Check length adequacy
+            model = transformers.AutoModelForCausalLM.from_pretrained(model_name, max_length=200).to(DEVICE)  # TODO Check length adequacy
             model.eval()
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=False)
             space_before_labels = False if model_is_chat else len(tokenizer.encode(' ' + labels[0], add_special_tokens=False)) == 1
             label_ids = [tokenizer.encode(' ' + label if space_before_labels else label, add_special_tokens=False)[-1] for label in labels]  # hmmmm that space tho
-            logging.info(f'Uosing label ids (space_before_labels={space_before_labels}): {label_ids}')
+            logging.info(f'Using label ids (space_before_labels={space_before_labels}): {label_ids}')
             cached_common_start = create_cache(model, tokenizer, prompt_start_for_cache) if prompt_start_for_cache else None    # TODO fix for chat models
 
             self.get_scores = functools.partial(self.get_multiple_choice_prob, model=model, tokenizer=tokenizer, label_ids=label_ids, cache=cached_common_start, space_before_labels=space_before_labels)
