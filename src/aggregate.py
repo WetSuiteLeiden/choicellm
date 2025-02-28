@@ -52,10 +52,10 @@ def main():
         df = df.set_index(['target_id', 'comparison_id']).pivot(columns=['position']).groupby('target_id').sample(args.n_comparisons).stack(level=1).reset_index()
     df['entropy'] = [-sum(prob * math.log2(prob) for prob in scores) for scores in df['proba']]
 
-    df_agg_per_word = df.groupby(['target_id', 'target']).agg({'score': 'mean', 'entropy': 'mean'})
+    df_agg_per_word = df.groupby(['target_id', 'target']).agg({'result': 'mean', 'entropy': 'mean'})
 
-    df_agg_per_word['score'] = df_agg_per_word['score'] * (scale_end - scale_start) + scale_start
-    df_agg_per_word.reset_index()[['target_id', 'target', 'score', 'entropy']].to_csv(sys.stdout, index=None)
+    df_agg_per_word['result'] = df_agg_per_word['result'] * (scale_end - scale_start) + scale_start
+    df_agg_per_word.reset_index()[['target_id', 'target', 'result', 'entropy']].to_csv(sys.stdout, index=None)
 
 
 
