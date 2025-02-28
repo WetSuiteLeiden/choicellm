@@ -9,7 +9,7 @@ authors = [{name="Matthijs Westera", email="m.westera@hum.leidenuniv.nl"}]
 description = "Using LLMs for rating items on a scale, comparative judgments, and multiple choice categorization."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["transformers", "torch", "accelerate", "optimum", "auto_gptq", "bitsandbytes", "openai", "tqdm", "python-dotenv", "tiktoken", "pandas"]
+dependencies = ["transformers", "torch", "accelerate", "optimum", "auto_gptq", "bitsandbytes", "openai", "tqdm", "python-dotenv", "tiktoken", "pandas", "matplotlib"]
 
 
 [project.scripts]

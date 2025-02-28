@@ -35,7 +35,7 @@ def main():
 
     converters = {
         'choices': lambda x: tuple(x.split(';')),
-        'scores': lambda x: tuple(float(s) for s in x.split(';')),
+        'proba': lambda x: tuple(float(s) for s in x.split(';')),
     }
 
     df = pandas.read_csv(args.file, index_col=None, converters=converters)
@@ -50,7 +50,7 @@ def main():
 
     if args.n_comparisons is not None:
         df = df.set_index(['target_id', 'comparison_id']).pivot(columns=['position']).groupby('target_id').sample(args.n_comparisons).stack(level=1).reset_index()
-    df['entropy'] = [-sum(prob * math.log2(prob) for prob in scores) for scores in df['scores']]
+    df['entropy'] = [-sum(prob * math.log2(prob) for prob in scores) for scores in df['proba']]
 
     df_agg_per_word = df.groupby(['target_id', 'target']).agg({'score': 'mean', 'entropy': 'mean'})
 
