@@ -19,8 +19,8 @@ DEFAULT_PROMPT_INFO = {
             {"item": "although", "response": 0},
             {"item": "blackbird", "response": 4},
             {"item": "bat", "response": 4},
-            {"item": "hope", "response": 0},
-        ],
+            {"item": "hope", "response": 0}
+        ]
     },
     'comparative': {
         "system_prompt": "# Concrete vs. abstract\n\nSome words and phrases are more concrete, some are more abstract. "
@@ -30,8 +30,8 @@ DEFAULT_PROMPT_INFO = {
         "examples": [
             {"choices": ["essentialness", "simulation", "bat", "living"], "response": 2},
             {"choices": ["blackbird", "high", "cause", "although"], "response": 0},
-            {"choices": ["signature", "frangipane", "hope", "simulation"], "response": 1},
-        ],
+            {"choices": ["signature", "frangipane", "hope", "simulation"], "response": 1}
+        ]
     },
     'categorical': {
         "system_prompt": "# Concrete vs. abstract\n\nSome words and phrases are more concrete, some are more abstract. "
@@ -49,9 +49,9 @@ DEFAULT_PROMPT_INFO = {
             {"item": "although", "response": 0},
             {"item": "blackbird", "response": 2},
             {"item": "bat", "response": 2},
-            {"item": "hope", "response": 0},
-        ],
-    },
+            {"item": "hope", "response": 0}
+        ]
+    }
 }
 
 
