@@ -30,20 +30,23 @@ def main():
     argparser.add_argument('--chat', action='store_true', help='Whether to prompt the model like a chat/instruct model; otherwise prompt plain text.')
 
     argparser.add_argument('--mode', choices=['scalar', 'comparative', 'categorical'], default='scalar', help='What kind of prompting: rating on a scale, comparative judgments, or multiple-choice given categories.')
-    argparser.add_argument('--raw', type=argparse.FileType('w'), default=None, help='Optional file to write raw model output to (comparative judgments in case of --mode comparative; GPT output in case of gpt)')
+
+    # TODO This option seems to no longer do anything?
+    argparser.add_argument('--raw', type=argparse.FileType('w'), default=None, help='[not implemented yet] Optional file to write raw model output to (comparative judgments in case of --mode comparative; GPT output in case of gpt)')
 
     argparser.add_argument('--labels', nargs='+', required=False, type=str, default=None, help='If not given, default 1, 2, 3, 4, 5 for scalar, alphabetic otherwise.')
 
     # if --mode categorical:
     # TODO implement this, albeit low-priority, maybe replacing --all_positions
     argparser.add_argument('--n_orders', type=int, help='[not implemented yet] Whether to randomize the order of the categories, and if so, how often; -1 means all orders.', default=None)
+    # TODO implement this
+    argparser.add_argument('--multi', type=int, help='[not implemented yet] To allow multiple categories per item; under the hood, does multiple single-category scales.', default=None)
 
     # If --mode comparative:
     argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if --comparative; file containing the words to compare against. Default is the main file argument itself.')
     argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if --comparative.')
     argparser.add_argument('--n_choices', required=False, type=int, default=4, help='Choices per comparison; only if --comparative.')
     argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if --comparative.')
-
 
     # only for backwards comp:
     argparser.add_argument('--comparative', action='store_true', help='[backwards compatibility only] Whether to do comparative judgments instead of absolute/scale.')
@@ -77,7 +80,7 @@ def main():
     if not args.chat and client:
         logging.warning('WARNING: Given --openai, assuming --chat was intended too.')
         args.chat = True
-    if not args.chat and 'instruct' in args.model:
+    if not args.chat and 'instruct' in args.model.lower():
         logging.warning('WARNING: Given "instruct" model, assuming --chat was intended too.')
         args.chat = True
 
