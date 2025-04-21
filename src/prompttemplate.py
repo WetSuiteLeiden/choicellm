@@ -65,16 +65,13 @@ class PromptTemplate:
     - I want openai-style 'messages' (list of dicts) to behave the same, on the outside, as a formatable string.
     """
 
-    def __init__(self, *args, mode: Literal['scalar', 'comparative', 'categorical'] = 'scalar', for_chat: bool = False, space_before_labels=False, **kwargs):
+    def __init__(self, *args, mode: Literal['scalar', 'comparative', 'categorical'] = 'scalar', for_chat: bool = False, **kwargs):
 
         system_prompt, examples, prompt = (
             self.init_for_scalar if mode == 'scalar'
             else self.init_for_comparative if mode == 'comparative'
             else self.init_for_categorical
         )(*args, **kwargs)
-
-        if space_before_labels:
-            prompt += ' '
 
         if for_chat:
             self.prompt_format = [

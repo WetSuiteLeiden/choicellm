@@ -67,10 +67,11 @@ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.js
 You can also specify which scale to use, with `--labels`, as follows. Since this is a three-point scale, your few-shot examples in the `.json` specification of the prompt should use 0 as minimum and 2 as maximum response value.
 
 ```bash
-choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --labels 1 2 3 --mode scalar > results.csv
+choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --labels -1 0 1 --mode scalar > results.csv
 ```
 
-Negative scale values (like a scale -1, 0, 1) are currently not supported.
+Beware that negative scale values (like a scale -1, 0, 1) are currently supported only for local models with `transformers`, not through the OpenAI client. (This applies more generally to labels that do not map onto single token ids for the given tokenizer.)
+
 
 ## Which models to use?
 
