@@ -22,7 +22,13 @@ class MultipleChoiceModel:
 
         if client and model_is_chat:    # assuming openai gpt
             tokenizer = tiktoken.encoding_for_model('gpt-4o' if model_name.startswith('o1') else model_name)    # TODO meh
-            label_ids = [tokenizer.encode(label)[0] for label in labels]    # TODO verify they are all singleton ids
+            label_ids = [tokenizer.encode(label) for label in labels]
+
+            problematic_label_ids = [label for label, label_id in zip(labels, label_ids) if len(label_id) != 1]
+            if problematic_label_ids:
+                raise ValueError(f'Some of the choice labels do not map onto single tokens for your selected model: {", ".join(problematic_label_ids)}')
+
+            label_ids = [label_id[0] for label_id in label_ids]
             logging.info(f'Using label ids: {label_ids}')
             # TODO: For o1 model, logprobs not supported; so consider disabling the logprobs and just getting the output directly?
             self.get_scores = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=client, labels=labels, label_ids=label_ids)
@@ -31,7 +37,13 @@ class MultipleChoiceModel:
             model.eval()
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=False)
             space_before_labels = False if model_is_chat else len(tokenizer.encode(' ' + labels[0], add_special_tokens=False)) == 1
-            label_ids = [tokenizer.encode(' ' + label if space_before_labels else label, add_special_tokens=False)[-1] for label in labels]  # hmmmm that space tho
+            label_ids = [tokenizer.encode(' ' + label if space_before_labels else label, add_special_tokens=False) for label in labels]  # hmmmm that space tho
+
+            problematic_label_ids = [label for label, label_id in zip(labels, label_ids) if len(label_id) != 1]
+            if problematic_label_ids:
+                raise ValueError(f'Some of the choice labels do not map onto single tokens for your selected model: {", ".join(problematic_label_ids)}')
+
+            label_ids = [label_id[0] for label_id in label_ids]
             logging.info(f'Using label ids (space_before_labels={space_before_labels}): {label_ids}')
             cached_common_start = create_cache(model, tokenizer, prompt_start_for_cache) if prompt_start_for_cache else None    # TODO fix for chat models
 
