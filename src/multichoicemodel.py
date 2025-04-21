@@ -3,9 +3,8 @@ import copy
 import logging
 import transformers
 import functools
-from typing import Union, Generator
+from typing import Union
 import tiktoken
-import math
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -14,8 +13,7 @@ class MultipleChoiceModel:
     """
     Wrapper around huggingface base LLMS and openai chat models for multiple-choice prompting, implementing a `get_scores` method.
 
-    Justification:
-    -
+    Its main role is to extract the computed logits to obtain probabilities for the multiple choices.
     """
 
     def __init__(self, model_name, labels, model_is_chat, prompt_start_for_cache=None, client=None):
@@ -32,7 +30,7 @@ class MultipleChoiceModel:
                 raise ValueError(f'Some of the choice labels do not map onto single tokens for your selected model: {", ".join(problematic_labels)}')
             logging.info(f'Using label ids: {label_ids}')
 
-        else:
+        else:  # assuming local transformers model
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=False)
             labels_tokenized = [tokenizer.encode(label if model_is_chat else ' ' + label, add_special_tokens=False) for label in labels]
             model = transformers.AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
@@ -50,7 +48,16 @@ class MultipleChoiceModel:
         pass    # Hmmm... Overwritten by init.
 
     @staticmethod
-    def get_multiple_choice_prob(prompt: Union[str, list[dict]], model, tokenizer, labels_tokenized, cache=None) -> list[float]:
+    def get_multiple_choice_prob(prompt: Union[str, list[dict]], model, tokenizer, labels_tokenized: list[int], cache=None) -> list[float]:
+        """
+        Feeds prompt into a local transformers model, and obtains the probabilities of the different multiple-choice
+        labels.
+
+        Because the labels can in principle be multi-token, it takes a bit of work to get their probabilities, with iterative
+        prompting based on growing prefixes, and multiplying the resulting conditional probabilities.
+
+        When labels are single tokens, this function simply applies the model once and get the logits directly.
+        """
 
         # TODO: Generalize and expose this function, maybe in a more general LLM utils module?
 
@@ -59,13 +66,8 @@ class MultipleChoiceModel:
         else:   # openai-style messages
             prompt_encoded = tokenizer.apply_chat_template(prompt, return_tensors="pt", add_generation_prompt=True, return_dict=True).to(DEVICE)
 
-        # Because the choice labels can be multi-token, it takes a bit of work to get their probabilities.
-        # We start from probability 1 per label, and then iteratively multiply this to finally get the
-        # multi-token label probabilities:
-        choice_probabilities = [1 for _ in labels_tokenized]
-
+        choice_probabilities = [1 for _ in labels_tokenized]  # to be iteratively multiplied (conditional probabilities)
         for prefix, label_ids, next_token_ids in get_label_prefixes(tuple(tuple(t) for t in labels_tokenized)):
-            past_key_values = copy.deepcopy(cache) if cache else None
             prompt_encoded_plus_prefix = torch.cat(
                 (prompt_encoded['input_ids'], torch.tensor([prefix], dtype=int).to(DEVICE)),
                 dim=-1
@@ -74,22 +76,23 @@ class MultipleChoiceModel:
                 (prompt_encoded['attention_mask'], torch.tensor([[1] * len(prefix)], dtype=int).to(DEVICE)),
                 dim=-1
             )
-            model_output = model.generate(input_ids=prompt_encoded_plus_prefix,
-                                          attention_mask=attention_mask_plus_prefix,  # only to avoid a warning
-                                          pad_token_id=tokenizer.eos_token_id,
-                                          output_logits=True,
-                                          return_dict_in_generate=True,
-                                          do_sample=False,
-                                          max_new_tokens=1,
-                                          past_key_values=past_key_values,
-                                          temperature=None,  # only to avoid a warning
-                                          top_p=None)
+            model_output = model.generate(
+                input_ids=prompt_encoded_plus_prefix,
+                attention_mask=attention_mask_plus_prefix,  # only to avoid a warning
+                pad_token_id=tokenizer.eos_token_id,
+                output_logits=True,
+                return_dict_in_generate=True,
+                do_sample=False,
+                max_new_tokens=1,
+                past_key_values=copy.deepcopy(cache) if cache else None,
+                temperature=None,  # only to avoid a warning
+                top_p=None
+            )
 
             next_token_ids_unique = list(set(next_token_ids))
-
-            logits = model_output.logits[0]  # [0] = first generated token
+            logits = model_output.logits[0]  # [0] is first (and only) generated token
             logits_to_use = logits[:, next_token_ids_unique]
-            probs_to_use = torch.nn.functional.softmax(logits_to_use, dim=-1)[0].tolist()   # [0] = first batch (only one)
+            probs_to_use = torch.nn.functional.softmax(logits_to_use, dim=-1)[0].tolist()   # [0] is first (and only) batch
             token_id_to_prob = dict(zip(next_token_ids_unique, probs_to_use))
 
             for label_id, next_token_id in zip(label_ids, next_token_ids):
