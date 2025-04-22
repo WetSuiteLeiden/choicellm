@@ -30,6 +30,8 @@ Instead of asking the model to rate items on a scale (`--mode scalar`), we can a
 choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode categorical > results.csv
 ```
 
+Note that `--mode categorical` is most suited for single-label categorization: the category probabilities sum to one (under the hood, the LLM is not given the option of listing several categories). See **Multi-label classification** below for instructions how to best achieve this.
+
 Finally, we can set `--mode comparative` to ask the model to compare each item to a large number of random other items, which can result in more reliable per-item scores (once aggregated over all comparisons).
 
 ```bash
@@ -71,6 +73,18 @@ choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.js
 ```
 
 Beware that negative scale values (like a scale -1, 0, 1) are currently supported only for local models with `transformers`, not through the OpenAI client. (This applies more generally to labels that do not map onto single token ids for the given tokenizer.)
+
+## Multi-label classification
+
+As mentioned, `--mode categorical` is suited for single-label classification, as the model is forced to choose _one_ out of several categories. To achieve _multi-label_ classification (where the same instance may fit several categories at once), the recommended approach is to implement this as multiple, separate `--mode scalar` runs, one for each category. This can be easily achieved in Bash by looping over the categories as follows:
+
+```bash
+for category in games movies music sports; do
+    cat items.txt | choicellm --model 'unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit' --chat --mode scalar --prompt "$category.json" > "$category.csv"
+done
+```
+
+This requires a separate `.json` prompt file for each category (each with its own system prompt, and few-shot examples specific to that category) -- which is probably a good idea regardless, as it encourages fine-tuning and evaluating the prompt for each category separately. The `.csv` results files (one per category) need to be merged afterward, which is fairly straightforward using (for instance) the `pandas` library. 
 
 
 ## Which models to use?
