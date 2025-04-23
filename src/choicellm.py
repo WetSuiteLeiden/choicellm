@@ -39,8 +39,6 @@ def main():
     # if --mode categorical:
     # TODO implement this, albeit low-priority, maybe replacing --all_positions
     argparser.add_argument('--n_orders', type=int, help='[not implemented yet] Whether to randomize the order of the categories, and if so, how often; -1 means all orders.', default=None)
-    # TODO implement this
-    argparser.add_argument('--multi', type=int, help='[not implemented yet] To allow multiple categories per item; under the hood, does multiple single-category scales.', default=None)
 
     # If --mode comparative:
     argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if --comparative; file containing the words to compare against. Default is the main file argument itself.')
@@ -53,8 +51,6 @@ def main():
     argparser.add_argument('--scale', nargs='+', required=False, type=int, default=None, help='[backwards compatibility only] For --mode scalar')
 
     args = argparser.parse_args()
-
-    # TODO: Implement multi-label classification? one-versus-rest classification?
 
     # For backwards compatibility:
     if args.comparative:
