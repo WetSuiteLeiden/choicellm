@@ -147,7 +147,7 @@ def create_cache(model, tokenizer, common_start: str) -> transformers.DynamicCac
 
 
 @functools.cache
-def get_label_prefixes(labels_tokenized: tuple[tuple[int]]) -> list[tuple[tuple[int], tuple[int], tuple[int]]]:
+def get_label_prefixes(labels_tokenized: tuple[tuple[int]]) -> list[tuple[tuple[int], list[int], list[int]]]:
     """
     # TODO: Generalize.
 
