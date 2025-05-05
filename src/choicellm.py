@@ -13,7 +13,7 @@ from openai import OpenAI
 from tqdm import tqdm
 import functools
 
-from prompttemplate import PromptTemplate, DEFAULT_PROMPT_INFO
+from prompttemplate import PromptTemplate
 from multichoicemodel import MultipleChoiceModel
 
 
@@ -22,7 +22,8 @@ def main():
 
     argparser = argparse.ArgumentParser()
     argparser.add_argument('file', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
-    argparser.add_argument('--prompt', required=False, type=argparse.FileType('r'), default=None)
+    argparser.add_argument('--prompt', required=True, type=argparse.FileType('r'), default=None, help='.json file containing the prompt template, few-shot examples, etc. To generate a suitable template, first use the auxiliary command choicellm-template and adapt the template to your needs.')
+
     argparser.add_argument('--seed', required=False, type=int, default=None)
     argparser.add_argument('--model', required=False, type=str, default="unsloth/llama-3-70b-bnb-4bit", help='Currently supports base models via transformers, and chat models through OpenAI (specify --openai in that case).')
 
@@ -46,19 +47,7 @@ def main():
     argparser.add_argument('--n_choices', required=False, type=int, default=4, help='Choices per comparison; only if --comparative.')
     argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if --comparative.')
 
-    # only for backwards comp:
-    argparser.add_argument('--comparative', action='store_true', help='[backwards compatibility only] Whether to do comparative judgments instead of absolute/scale.')
-    argparser.add_argument('--scale', nargs='+', required=False, type=int, default=None, help='[backwards compatibility only] For --mode scalar')
-
     args = argparser.parse_args()
-
-    # For backwards compatibility:
-    if args.comparative:
-        logging.warning('Don\'t use --comparative; kept for backwards compatibility only. Use --mode comparative instead.')
-        args.mode = 'comparative'
-    if args.scale:
-        logging.warning('Don\'t use --scale; kept for backwards compatibility only. Use --labels instead.')
-        args.labels = args.scale
 
     dotenv.load_dotenv()
     logging.basicConfig(level=logging.INFO, format='')
@@ -80,7 +69,8 @@ def main():
         logging.warning('WARNING: Given "instruct" model, assuming --chat was intended too.')
         args.chat = True
 
-    prompt_info = json.load(args.prompt) if args.prompt else DEFAULT_PROMPT_INFO[args.mode]
+    prompt_info = json.load(args.prompt)
+
     input_lines = list(line.strip() for line in args.file)
     labels = (
         args.labels[:args.n_choices] if args.mode == 'comparative'
