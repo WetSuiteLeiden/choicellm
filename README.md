@@ -6,9 +6,17 @@
 pip install git+https://github.com/mwestera/choicellm
 ```
 
-If you want to use models through the OpenAI api, then you need to set the `OPENAI_API_KEY` environment variable to your key, or (alternatively) add a file `.env` in your working directory containing your OpenAI API key, specified like this:
+This tool lets you use local LLMs (`transformers` library). It also supports models through the OpenAI API, in which case you need to set the `OPENAI_API_KEY` environment variable to your secret key:
 
-`OPENAI_API_KEY=yoursecretkey123`
+```bash
+export OPENAI_API_KEY=yoursecretkey123
+```
+
+Or, alternatively, add a file `.env` in your working directory containing your OpenAI API key like this:
+
+```
+OPENAI_API_KEY=yoursecretkey123
+```
 
 Installation makes available the command `choicellm`, and a helper program `choicellm_aggregate`
 
