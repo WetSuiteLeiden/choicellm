@@ -5,11 +5,8 @@ import itertools
 import random
 import logging
 from typing import Generator, Union, Iterable
-import string
-import json
 import os
 from openai import OpenAI
-from tqdm import tqdm
 import functools
 
 from prompttemplate import PromptTemplate
