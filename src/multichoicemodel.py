@@ -16,9 +16,9 @@ class MultipleChoiceModel:
     Its main role is to extract the computed logits to obtain probabilities for the multiple choices.
     """
 
-    def __init__(self, model_name, labels, model_is_chat, prompt_start_for_cache=None, client=None):
+    def __init__(self, model_name, labels, prompt_start_for_cache=None, client=None):
 
-        if client and model_is_chat:    # assuming openai gpt
+        if client:    # assuming openai gpt
             tokenizer = tiktoken.encoding_for_model('gpt-4o' if model_name.startswith('o1') else model_name)    # TODO meh
             labels_tokenized = [tokenizer.encode(label) for label in labels]
             label_ids = [label_tokenized[0] for label_tokenized in labels_tokenized]
@@ -32,7 +32,7 @@ class MultipleChoiceModel:
 
         else:  # assuming local transformers model
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=False)
-            labels_tokenized = [tokenizer.encode(label if model_is_chat else ' ' + label, add_special_tokens=False) for label in labels]
+            labels_tokenized = [tokenizer.encode(label, add_special_tokens=False) for label in labels]
             model = transformers.AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
             model.eval()
 

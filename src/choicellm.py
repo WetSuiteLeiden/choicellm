@@ -4,10 +4,9 @@ import sys
 import itertools
 import random
 import logging
-from typing import Generator, Union
+from typing import Generator, Union, Iterable
 import string
 import json
-import dotenv
 import os
 from openai import OpenAI
 from tqdm import tqdm
@@ -25,78 +24,99 @@ def main():
     argparser.add_argument('--prompt', required=True, type=argparse.FileType('r'), default=None, help='.json file containing the prompt template, few-shot examples, etc. To generate a suitable template, first use the auxiliary command choicellm-template and adapt the template to your needs.')
 
     argparser.add_argument('--seed', required=False, type=int, default=None)
-    argparser.add_argument('--model', required=False, type=str, default="unsloth/llama-3-70b-bnb-4bit", help='Currently supports base models via transformers, and chat models through OpenAI (specify --openai in that case).')
-
-    argparser.add_argument('--openai', action='store_true', help='Whether to use the openai API; otherwise --model is assumed to be a local model via huggingface transformers.')
-    argparser.add_argument('--chat', action='store_true', help='Whether to prompt the model like a chat/instruct model; otherwise prompt plain text.')
-
-    argparser.add_argument('--mode', choices=['scalar', 'comparative', 'categorical'], default='scalar', help='What kind of prompting: rating on a scale, comparative judgments, or multiple-choice given categories.')
+    argparser.add_argument('--model', required=False, type=str, default="unsloth/Llama-3.2-1B", help='Currently supports base models via transformers, and chat models through OpenAI (specify --openai in that case).')
+    argparser.add_argument('--openai', action='store_true', help='Whether to use the OpenAI API; otherwise --model is assumed to be a local model via huggingface transformers.')
 
     # TODO This option seems to no longer do anything?
     argparser.add_argument('--raw', type=argparse.FileType('w'), default=None, help='[not implemented yet] Optional file to write raw model output to (comparative judgments in case of --mode comparative; GPT output in case of gpt)')
 
-    argparser.add_argument('--labels', nargs='+', required=False, type=str, default=None, help='If not given, default 1, 2, 3, 4, 5 for scalar, alphabetic otherwise.')
-
     # if --mode categorical:
-    # TODO implement this, albeit low-priority, maybe replacing --all_positions
+    # TODO low-priority implement this, maybe replacing --all_positions
     argparser.add_argument('--n_orders', type=int, help='[not implemented yet] Whether to randomize the order of the categories, and if so, how often; -1 means all orders.', default=None)
 
     # If --mode comparative:
-    argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if --comparative; file containing the words to compare against. Default is the main file argument itself.')
-    argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if --comparative.')
-    argparser.add_argument('--n_choices', required=False, type=int, default=4, help='Choices per comparison; only if --comparative.')
-    argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if --comparative.')
+    argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if comparative; file containing the words to compare against. Default is the main file argument itself.')
+    argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if comparative.')
+    argparser.add_argument('--n_choices', required=False, type=int, default=4, help='Choices per comparison; only if comparative.')
+    argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if comparative.')
+
+    # Backwards comp:
+    argparser.add_argument('--mode', choices=['scalar', 'comparative', 'categorical'], default=None, help='[Backwards compatibility only] What kind of prompting: rating on a scale, comparative judgments, or multiple-choice given categories.')
+    argparser.add_argument('--labels', nargs='+', required=False, type=str, default=None, help='[Backwards compatibility only] If not given, default 1, 2, 3, 4, 5 for scalar, alphabetic otherwise.')
+    argparser.add_argument('--chat', action='store_true', help='[Backwards compatibility only] Whether to prompt the model like a chat/instruct model; otherwise prompt plain text.')
 
     args = argparser.parse_args()
 
-    dotenv.load_dotenv()
     logging.basicConfig(level=logging.INFO, format='')
     if args.seed is None:
         args.seed = random.randint(0, 99999)
         random.seed(args.seed)
         logging.info(f'{args.seed=}')
 
-    if args.mode == 'scalar':
-        args.labels = [int(l) for l in args.labels] if args.labels else [1, 2, 3, 4, 5]
-    else:
-        args.labels = args.labels or list(string.ascii_uppercase)
+    prompt_info = json.load(args.prompt)  # TODO: JSON validation, incl. labels for categorical/comparative must be strings
+    prompt_info.pop('_comment', None)  # possible comment field in JSON templates
+
+    args, prompt_info = backwards_compatibility(args, prompt_info)
+
+    mode = prompt_info.pop('mode')
+    do_chat = prompt_info.pop('chat')
+
+    if args.model == argparser.get_default('model'):
+        logging.warning(f'WARNING: Using default model {args.model}, which is quite small and may not yield very accurate results; use --model to override it.')
+    if not args.openai and 'gpt4' in args.model:
+        logging.warning('WARNING: If you meant to use a model available through the OpenAI API, include --openai.')
+    if args.openai and not do_chat:
+        logging.warning('WARNING: Given --openai, you\'re advised to use a chat-style prompt.')
+    if 'instruct' in args.model.lower() and not do_chat:
+        logging.warning('WARNING: Given "instruct" model, you\'re advised to use a chat-style prompt.')
 
     client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY')) if args.openai else None
-    if not args.chat and client:
-        logging.warning('WARNING: Given --openai, assuming --chat was intended too.')
-        args.chat = True
-    if not args.chat and 'instruct' in args.model.lower():
-        logging.warning('WARNING: Given "instruct" model, assuming --chat was intended too.')
-        args.chat = True
 
-    prompt_info = json.load(args.prompt)
+    if mode in ('categorical', 'comparative') and 'labels' not in prompt_info:
+        # TODO: In future, allow using categories/items themselves as labels; for now, just ABCD...
+        prompt_info['labels'] = list(string.ascii_uppercase)
 
-    input_lines = list(line.strip() for line in args.file)
-    labels = (
-        args.labels[:args.n_choices] if args.mode == 'comparative'
-        else args.labels[:len(prompt_info['categories'])] if args.mode == 'categorical'
-        else [str(i) for i in args.labels]
+    if mode == 'comparative':
+        prompt_info['n_choices'] = args.n_choices  # meh... only needed to get the right prompt format {} {} {} {}
+
+    prompt_template = PromptTemplate(mode=mode, do_chat=do_chat, **prompt_info) # TODO add .from_file(...) to wrap all of the above.
+
+    labels_for_logits = (   # meh...
+        prompt_info['labels'][:args.n_choices] if mode == 'comparative'
+        else prompt_info['labels'][:len(prompt_info['categories'])] if mode == 'categorical'
+        else [str(i) for i in prompt_info['scale']]
     )
+    if not do_chat:   # meh...
+        labels_for_logits = [' ' + l for l in labels_for_logits]
 
-    prompt_template = PromptTemplate(**prompt_info, labels=labels, mode=args.mode, for_chat=args.chat)
-    model = MultipleChoiceModel(model_name=args.model, labels=labels, prompt_start_for_cache=prompt_template.prompt_start_for_cache, model_is_chat=args.chat, client=client)
+    model = MultipleChoiceModel(model_name=args.model, labels=labels_for_logits, prompt_start_for_cache=prompt_template.prompt_start_for_cache, client=client)
 
-    # TODO: How to chunk/wrap these?
-    if args.mode == 'comparative':
-        compare_to = list(line.strip() for line in args.compare_to) if args.compare_to is not None else input_lines
-        n_comparisons = args.n_choices * args.n_comparisons
-        assert len(compare_to) >= n_comparisons + 1, f'Not enough items for {n_comparisons} comparisons! Decrease n_alternatives or n_comparisons.'
+    input_lines = (l.strip() for l in args.file)
+
+    if mode == 'comparative':
+        if args.compare_to:
+            compare_to = [l.strip() for l in args.compare_to]
+        else:
+            compare_to = input_lines = list(input_lines)
+        if len(compare_to) < args.n_comparisons + 1:
+            raise ValueError(f'Not enough comparison items for {args.n_choices} × {args.n_comparisons} comparisons per item. '
+                             f'Decrease --n_choices or --n_comparisons, or provide a longer list of items to compare'
+                             f'to (--compare_to).')
+        logging.info(f'Will do {args.n_comparisons * (args.n_choices if args.all_positions else 1)} comparisons per input line.')
+
+    if mode == 'comparative':
         items = iter_items_comparison(input_lines, args.n_choices, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
         fieldnames = ['target_id', 'comparison_id', 'position', 'target', 'result', 'choices', 'proba']
-        process_result = get_score_at_position
-    elif args.mode == 'categorical':
-        items = iter_items_basic(input_lines, prompt_template)
-        fieldnames = ['target_id', 'target', 'result', 'proba']
-        process_result = functools.partial(get_max_category, category_names=list(prompt_info['categories'].keys()))
     else:
         items = iter_items_basic(input_lines, prompt_template)
         fieldnames = ['target_id', 'target', 'result', 'proba']
-        process_result = functools.partial(get_weighted_sum, scale=args.labels)
+
+    if mode == 'comparative':
+        process_result = get_score_at_position
+    elif mode == 'categorical':
+        process_result = functools.partial(get_max_category, category_names=list(prompt_info['categories']))
+    else:
+        process_result = functools.partial(get_weighted_sum, scale=prompt_info['scale'])
 
     logging.info(f'-------\n{prompt_template}\n-------')
 
@@ -107,7 +127,7 @@ def main():
 
         scores = model.get_scores(row['prompt'])
 
-        if args.mode == 'comparative':  # only mode where postprocess is dependent on row['position']...
+        if mode == 'comparative':  # only mode where postprocess is dependent on row['position']...
             process_result = functools.partial(process_result, position=row['position'])
 
         result = process_result(scores)
@@ -130,23 +150,18 @@ def get_weighted_sum(scores: list[float], scale: list[int | float]) -> float:
     return sum(s * n for s, n in zip(scores, scale))
 
 
-def iter_items_basic(lines: list[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
-
-    for n, line in tqdm(enumerate(lines), total=len(lines)):    # TODO Remove progress bars?!
+def iter_items_basic(lines: Iterable[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
+    for n, line in enumerate(lines):
         prompt = prompt_template.format(line)
         yield {'target_id': n, 'target': line, 'prompt': prompt}
 
 
-def iter_items_comparison(lines: list[str], n_choices: int, n_comparisons: int, all_positions: bool, prompt_template: Union[str, PromptTemplate], compare_to: list[str] = None) -> Generator[dict, None, None]:
-    compare_to = compare_to or lines
-    total_n_comparisons = len(lines) * n_comparisons * (n_choices if all_positions else 1)
-    logging.info(f'Will do {total_n_comparisons} comparisons.')
+def iter_items_comparison(lines: Iterable[str], n_choices: int, n_comparisons: int, all_positions: bool, prompt_template: Union[str, PromptTemplate], compare_to: list[str]) -> Generator[dict, None, None]:
+
     n_alternatives = n_choices - 1
 
-    for item_id, item in tqdm(enumerate(lines), total=len(lines)):
-
+    for item_id, item in enumerate(lines):
         all_alternatives = random_sample_not_containing(compare_to, n_comparisons * n_alternatives, item_to_exclude=item)
-
         for comp_id, alternatives in enumerate(batched(all_alternatives, n_alternatives)):
             positions = range(n_choices) if all_positions else [random.randint(0, n_alternatives)]
             for pos in positions:
@@ -174,6 +189,29 @@ def batched(iterable, n, *, strict=False):
         if strict and len(batch) != n:
             raise ValueError('batched(): incomplete batch')
         yield batch
+
+
+def backwards_compatibility(args, prompt_info):
+    if args.mode:
+        logging.warning(f'WARNING: --mode will be deprecated; specify the mode inside the prompt .json file instead, as "mode": "{args.mode}"')
+        prompt_info['mode'] = args.mode
+
+    if args.labels:
+        logging.warning(f'WARNING: --labels will be deprecated; specify the scale or labels inside the prompt .json file instead, under "scale" (for scalar), or "categories" (otherwise)')
+        if prompt_info['mode'] == 'scalar':
+            prompt_info['scale'] = [int(l) for l in args.labels]
+        else:
+            prompt_info['labels'] = args.labels
+
+    if args.chat:
+        logging.warning(f'WARNING: --chat will be deprecated; specify the prompt type inside the prompt .json file instead, as "chat": true (mind the lowercase, it\'s JSON, not Python)')
+        prompt_info['chat'] = True
+
+    if "chat" not in prompt_info:
+        logging.warning(f'WARNING: The prompt .json file does not specify whether to use chat-style prompting; assuming "chat": false')
+        prompt_info['chat'] = False
+
+    return args, prompt_info
 
 
 if __name__ == '__main__':
