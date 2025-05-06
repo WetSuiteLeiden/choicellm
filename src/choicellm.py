@@ -64,11 +64,11 @@ def main():
     client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY')) if args.openai else None
     model = MultipleChoiceModel(model_name=args.model, labels=prompt_template.labels_for_logits, prompt_start_for_cache=prompt_template.prompt_start_for_cache, client=client)
 
-    inputs = (l.strip() for l in args.file)
+    inputs = (line.strip() for line in args.file)
 
     if do_comparative:
         if args.compare_to:
-            compare_to = [l.strip() for l in args.compare_to]
+            compare_to = [line.strip() for line in args.compare_to]
         else:
             compare_to = inputs = list(inputs)
         items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
