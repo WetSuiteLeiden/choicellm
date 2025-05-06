@@ -35,7 +35,7 @@ class PromptTemplate:
         )(*args, **kwargs)
 
         if mode == 'comparative':
-            self.labels_for_logits = kwargs['labels'][:kwargs['n_choices']]
+            self.labels_for_logits = kwargs['labels'][:kwargs['n_choices']]  # TODO labels_for_logits is the model's business...
         elif mode == 'categorical':
             self.labels_for_logits = kwargs['labels'][:len(kwargs['categories'])]
             self.categories = kwargs['categories']
