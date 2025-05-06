@@ -7,6 +7,8 @@ import logging
 import argparse
 
 
+# TODO: Drastic refactoring needed
+
 class PromptTemplate:
 
     """
@@ -17,7 +19,10 @@ class PromptTemplate:
     - I want openai-style 'messages' (list of dicts) to behave the same, on the outside, as a formatable string.
     """
 
-    def __init__(self, mode: Literal['scalar', 'comparative', 'categorical'], do_chat: bool, *args, **kwargs):
+    def __init__(self, mode: Literal['scalar', 'comparative', 'categorical'], is_chat: bool, *args, **kwargs):
+
+        self.mode = mode
+        self.is_chat = is_chat
 
         system_prompt, examples, prompt = (
             self.init_for_scalar if mode == 'scalar'
@@ -25,7 +30,18 @@ class PromptTemplate:
             else self.init_for_categorical
         )(*args, **kwargs)
 
-        if do_chat:
+        if mode == 'comparative':
+            self.labels_for_logits = kwargs['labels'][:kwargs['n_choices']]
+        elif mode == 'categorical':
+            self.labels_for_logits = kwargs['labels'][:len(kwargs['categories'])]
+            self.categories = kwargs['categories']
+        else:
+            self.scale = kwargs['scale']
+            self.labels_for_logits = [str(i) for i in kwargs['scale']]
+        if not self.is_chat:  # meh...
+            self.labels_for_logits = [' ' + l for l in self.labels_for_logits]
+
+        if is_chat:
             self.prompt_format = [
                 {"role": "developer", "content": system_prompt},
                 *itertools.chain(*([{"role": "user", "content": example}, {"role": "assistant", "content": response}] for example, response in examples)),
@@ -51,6 +67,32 @@ class PromptTemplate:
             return self.prompt_format
         else:
             return json.dumps(self.prompt_format, indent=2)
+
+    @classmethod
+    def from_json(cls, file, **kwargs):
+
+        prompt_info = json.load(file)  # TODO: JSON validation, incl. labels for categorical/comparative must be strings
+        prompt_info.pop('_comment', None)
+
+        if "chat" not in prompt_info:
+            logging.warning(
+                f'WARNING: The prompt .json file does not specify whether to use chat-style prompting; assuming "chat": false')
+            prompt_kwargs['chat'] = False
+
+        prompt_info['is_chat'] = prompt_info.pop('chat')
+
+        mode = prompt_info['mode']
+        is_chat = prompt_info['mode']
+
+        if mode in ('categorical', 'comparative') and 'labels' not in prompt_info:
+            # TODO: In future, allow using categories/items themselves as labels; for now, just ABCD...
+            prompt_info['labels'] = list(string.ascii_uppercase)
+
+        if mode != 'comparative':
+            del kwargs['n_choices']  # meh
+
+        return cls(**prompt_info, **kwargs)
+
 
     @staticmethod
     def init_for_scalar(system_prompt: str, prompt_format: str, examples: list[dict], scale: list[int | float]) -> tuple[str, list[tuple[str, str]], str]:
@@ -220,7 +262,7 @@ def main():
 
     argparser = argparse.ArgumentParser('Auxiliary command to generate prompt template .json files.')
     argparser.add_argument('--chat', action='store_true', help='Whether to prompt the model like a chat/instruct model; otherwise plain text generation.')
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = argparser.add_mutually_exclusive_group(required=True)
     group.add_argument('--comparative', action='store_true', help='Generate a prompt template for choicellm --mode comparative.')
     group.add_argument('--scalar', action='store_true', help='Generate a prompt template for choicellm --mode scalar.')
     group.add_argument('--categorical', action='store_true', help='Generate a prompt template for choicellm --mode categorical.')
