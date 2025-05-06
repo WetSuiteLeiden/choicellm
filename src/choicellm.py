@@ -16,6 +16,8 @@ from prompttemplate import PromptTemplate
 from multichoicemodel import MultipleChoiceModel
 
 
+N_DECIMALS = 6
+
 
 def main():
 
@@ -70,47 +72,50 @@ def main():
         else:
             compare_to = inputs = list(inputs)
         items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
-        fieldnames = ['target_id', 'comparison_id', 'position', 'target', 'result', 'choices', 'proba']
-        process_result = get_score_at_position
+        add_results_to_dict = add_results_comparative
     elif do_categorical:
         items = iter_items_basic(inputs, prompt_template)
-        fieldnames = ['target_id', 'target', 'result', 'proba']  # TODO Add category prob?
-        process_result = functools.partial(get_max_category, category_names=list(prompt_template.categories))
+        add_results_to_dict = functools.partial(add_results_categorical, category_names=list(prompt_template.categories))
     else:
         items = iter_items_basic(inputs, prompt_template)
-        fieldnames = ['target_id', 'target', 'result', 'proba']  # TODO Add max choice prob?
-        process_result = functools.partial(get_weighted_sum, scale=prompt_template.scale)
+        add_results_to_dict = functools.partial(add_results_scalar, scale=prompt_template.scale)
 
     logging.info(f'-------\n{prompt_template}\n-------')
 
-    csv_writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
-    csv_writer.writeheader()
+    csv_writer = csv.DictWriter(sys.stdout, fieldnames=None)  # fieldnames determined on first iter...
+    for item in items:
 
-    for row in items:
+        scores = model.get_scores(item['prompt'])
+        add_results_to_dict(item, scores)
+        del item['prompt']
 
-        scores = model.get_scores(row['prompt'])
-
-        if do_comparative:  # only mode where postprocess is dependent on row['position']...
-            process_result = functools.partial(process_result, position=row['position'])
-
-        result = process_result(scores)
-
-        row['result'] = result
-        row['proba'] = ';'.join(str(f) for f in scores)
-        del row['prompt']
-        csv_writer.writerow(row)
+        if not csv_writer.fieldnames:  # hmm
+            csv_writer.fieldnames = item.keys()
+            csv_writer.writeheader()
+        csv_writer.writerow(item)
 
 
-def get_score_at_position(scores: list[float], position: int) -> float:
-    return scores[position]
+def add_results_scalar(item: dict, scores: list[float], scale: list[int | float]):
+    max_index = max(range(len(scores)), key=lambda x: scores[x])
+    item['pred'] = scale[max_index]
+    item['prob'] = round(scores[max_index], N_DECIMALS)
+    item['rating'] = round(sum(s * n for s, n in zip(scores, scale)), N_DECIMALS)
+    item['probs'] = ';'.join(str(round(score, N_DECIMALS)) for score in scores)
 
 
-def get_max_category(scores: list[float], category_names: list[str]):
-    return category_names[max(range(len(scores)), key=lambda x: scores[x])]
+def add_results_comparative(item: dict, scores: list[float]):
+    max_index = max(range(len(scores)), key=lambda x: scores[x])
+    item['pred'] = item['choices'][max_index]
+    item['prob'] = round(scores[item['position']], N_DECIMALS)
+    item['probs'] = ';'.join(str(round(score, N_DECIMALS)) for score in scores)
+    item['choices'] = ';'.join(item['choices'])  # hmm
 
 
-def get_weighted_sum(scores: list[float], scale: list[int | float]) -> float:
-    return sum(s * n for s, n in zip(scores, scale))
+def add_results_categorical(item: dict, scores: list[float], category_names: list[str]):
+    max_index = max(range(len(scores)), key=lambda x: scores[x])
+    item['pred'] = category_names[max_index]
+    item['prob'] = round(scores[max_index], N_DECIMALS)
+    item['probs'] = ';'.join(str(round(score, N_DECIMALS)) for score in scores)
 
 
 def iter_items_basic(lines: Iterable[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
@@ -138,7 +143,7 @@ def iter_items_comparison(lines: Iterable[str], n_comparisons: int, all_position
             for pos in positions:
                 choices = alternatives[:pos] + [item] + alternatives[pos:]
                 prompt = prompt_template.format(*choices)
-                yield {'target_id': item_id, 'comparison_id': comp_id, 'position': pos, 'target': item, 'choices': ';'.join(choices), 'prompt': prompt}
+                yield {'target_id': item_id, 'comparison_id': comp_id, 'position': pos, 'target': item, 'choices': choices, 'prompt': prompt}
 
 
 def random_sample_not_containing(items: list, k: int, item_to_exclude) -> list:
