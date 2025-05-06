@@ -19,11 +19,15 @@ class PromptTemplate:
     - I want openai-style 'messages' (list of dicts) to behave the same, on the outside, as a formatable string.
     """
 
-    def __init__(self, mode: Literal['scalar', 'comparative', 'categorical'], is_chat: bool, *args, **kwargs):
+    def __init__(self, mode: Literal['scalar', 'comparative', 'categorical'], is_chat: bool, *args, n_choices: int = None, **kwargs):
 
         self.mode = mode
         self.is_chat = is_chat
+        if n_choices:
+            self.n_choices = n_choices  # meh
+            kwargs['n_choices'] = n_choices  # meh
 
+        # TODO: Call the following in load_from_json:
         system_prompt, examples, prompt = (
             self.init_for_scalar if mode == 'scalar'
             else self.init_for_comparative if mode == 'comparative'
@@ -69,7 +73,7 @@ class PromptTemplate:
             return json.dumps(self.prompt_format, indent=2)
 
     @classmethod
-    def from_json(cls, file, **kwargs):
+    def from_json(cls, file):
 
         prompt_info = json.load(file)  # TODO: JSON validation, incl. labels for categorical/comparative must be strings
         prompt_info.pop('_comment', None)
@@ -88,10 +92,7 @@ class PromptTemplate:
             # TODO: In future, allow using categories/items themselves as labels; for now, just ABCD...
             prompt_info['labels'] = list(string.ascii_uppercase)
 
-        if mode != 'comparative':
-            del kwargs['n_choices']  # meh
-
-        return cls(**prompt_info, **kwargs)
+        return cls(**prompt_info)
 
 
     @staticmethod
@@ -209,6 +210,7 @@ TEMPLATE_COMPARATIVE = {
     "system_prompt": "# Concrete vs. abstract\n\nSome words and phrases are more concrete, some are more abstract. "
                      "We can often tell which word or phrase, from a given set, is the _most concrete_ one.",
     "prompt_format": "## Example {n}.\n\n{choices}\n\nThe most concrete is{label_hint}:",  # TODO: Insert "choose from labels" only if choices are not single words?
+    "n_choices": 4,
     "labels": ["A", "B", "C", "D"],
     "examples": [
         {"options": ["essentialness", "simulation", "bat", "living"], "target_index": 2},
