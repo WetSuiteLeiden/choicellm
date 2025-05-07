@@ -54,8 +54,12 @@ def main():
     if 'instruct' in args.model.lower() and not prompt_template.is_chat:
         logging.warning('WARNING: Given "instruct" model, you\'re advised to use a chat-style prompt.')
 
-    client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY')) if args.openai else None
-    model = MultipleChoiceModel(model_name=args.model, labels=prompt_template.labels_for_logits, prompt_start_for_cache=prompt_template.prompt_start_for_cache, openai_client=client)
+    model = MultipleChoiceModel(
+        model_name=args.model,
+        labels=prompt_template.labels_for_logits,
+        prompt_start_for_cache=prompt_template.prompt_start_for_cache,
+        openai_client=OpenAI(api_key=os.environ.get('OPENAI_API_KEY')) if args.openai else None
+    )
 
     match prompt_template.mode:
         case 'comparative':
@@ -76,36 +80,36 @@ def main():
 
     csv_writer = DictWriterAutoHeader(sys.stdout)
     for item in items:
-        scores = model.get_scores(item['prompt'])
-        add_results_to_dict(item, scores)
+        probs = model.get_probs(item['prompt'])
+        add_results_to_dict(item, probs)
         del item['prompt']
         csv_writer.writerow(item)
 
 
-def add_results_scalar(item: dict, scores: list[float], scale: list[int | float]):
-    max_index = max(range(len(scores)), key=lambda x: scores[x])
-    scores = [round(s, N_DECIMALS) for s in scores]
+def add_results_scalar(item: dict, probs: list[float], scale: list[int | float]):
+    max_index = max(range(len(probs)), key=lambda x: probs[x])
+    probs = [round(s, N_DECIMALS) for s in probs]
     item['pred'] = scale[max_index]
-    item['prob'] = scores[max_index]
-    item['rating'] = round(sum(s * n for s, n in zip(scores, scale)), N_DECIMALS)
-    item['probs'] = ';'.join(str(score) for score in scores)
+    item['prob'] = probs[max_index]
+    item['rating'] = round(sum(s * n for s, n in zip(probs, scale)), N_DECIMALS)
+    item['probs'] = ';'.join(str(score) for score in probs)
 
 
-def add_results_comparative(item: dict, scores: list[float]):
-    max_index = max(range(len(scores)), key=lambda x: scores[x])
-    scores = [round(s, N_DECIMALS) for s in scores]
+def add_results_comparative(item: dict, probs: list[float]):
+    max_index = max(range(len(probs)), key=lambda x: probs[x])
+    probs = [round(s, N_DECIMALS) for s in probs]
     item['pred'] = item['choices'][max_index]
-    item['prob'] = scores[item['position']]
-    item['probs'] = ';'.join(str(score) for score in scores)
+    item['prob'] = probs[item['position']]
+    item['probs'] = ';'.join(str(score) for score in probs)
     item['choices'] = ';'.join(item['choices'])  # hmm
 
 
-def add_results_categorical(item: dict, scores: list[float], category_names: list[str]):
-    max_index = max(range(len(scores)), key=lambda x: scores[x])
-    scores = [round(s, N_DECIMALS) for s in scores]
+def add_results_categorical(item: dict, probs: list[float], category_names: list[str]):
+    max_index = max(range(len(probs)), key=lambda x: probs[x])
+    probs = [round(s, N_DECIMALS) for s in probs]
     item['pred'] = category_names[max_index]
-    item['prob'] = scores[max_index]
-    item['probs'] = ';'.join(str(score) for score in scores)
+    item['prob'] = probs[max_index]
+    item['probs'] = ';'.join(str(score) for score in probs)
 
 
 def iter_items_basic(lines: Iterable[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
@@ -137,6 +141,9 @@ def iter_items_comparison(lines: Iterable[str], n_comparisons: int, all_position
 
 
 def random_sample_not_containing(items: list, k: int, item_to_exclude) -> list:
+    """
+    Like random.sample(items, k), but excluding a specific element from the original. Original order not maintained.
+    """
     sample = random.sample(items, k=k + 1)  # one more just in case item is among them
     try:
         sample.remove(item_to_exclude)

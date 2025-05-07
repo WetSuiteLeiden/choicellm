@@ -23,7 +23,7 @@ class MultipleChoiceModel:
             labels_tokenized = [tokenizer.encode(label) for label in labels]
             label_ids = [label_tokenized[0] for label_tokenized in labels_tokenized]
             # TODO: For o1 model, logprobs not supported; so consider disabling the logprobs and just getting the output directly?
-            self.get_scores = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=openai_client, labels=labels, label_ids=label_ids)
+            self.get_probs = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=openai_client, labels=labels, label_ids=label_ids)
 
             problematic_labels = [label for label, label_tokenized in zip(labels, labels_tokenized) if len(label_tokenized) != 1]
             if problematic_labels:
@@ -37,11 +37,11 @@ class MultipleChoiceModel:
             model.eval()
 
             cached_common_start = create_cache(model, tokenizer, prompt_start_for_cache) if prompt_start_for_cache else None
-            self.get_scores = functools.partial(self.get_multiple_choice_prob,
-                                                model=model,
-                                                tokenizer=tokenizer,
-                                                labels_tokenized=labels_tokenized,
-                                                cache=cached_common_start)
+            self.get_probs = functools.partial(self.get_multiple_choice_prob,
+                                               model=model,
+                                               tokenizer=tokenizer,
+                                               labels_tokenized=labels_tokenized,
+                                               cache=cached_common_start)
 
 
     def get_scores(self, prompt: Union[str, list[str]]) -> list[float]:
