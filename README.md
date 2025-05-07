@@ -21,7 +21,7 @@ To generate an example prompt template (which you can then modify to suit your n
 choicellm-template --scalar > my_first_prompt.json
 ```
 
-Alternative modes are `--comparative` and `--categorical`. If you want to use an 'instruct' model, additionally specify `--chat`. (Note that the examples were written for a study on concreteness vs. abstractness; you can of course modify all of this.)
+Alternative modes are `--comparative` and `--categorical` (see below for some explanation, but you'll understand most from the generated prompt templates themselves). If you want to use an 'instruct' model, additionally specify `--chat`. (Note that the examples were written for a study on concreteness vs. abstractness; you can of course modify all of this.)
 
 When modifying a prompt, make sure to use all the parts in curly braces, like `{scale}`. These will be replaced by the program, according to the information you provide.
 
