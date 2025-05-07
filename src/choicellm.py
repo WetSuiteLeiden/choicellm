@@ -42,77 +42,70 @@ def main():
         random.seed(args.seed)
         logging.info(f'{args.seed=}')
 
+    inputs = (line.strip() for line in args.file)
+    prompt_template = PromptTemplate.from_json(args.prompt)
+
     if args.model == argparser.get_default('model'):
         logging.warning(f'WARNING: Using default model {args.model}, which is quite small and may not yield very accurate results; use --model to override it.')
     if not args.openai and 'gpt4' in args.model:
         logging.warning('WARNING: If you meant to use a model available through the OpenAI API, include --openai.')
-
-    prompt_template = PromptTemplate.from_json(args.prompt)
-
-    do_comparative = prompt_template.mode == 'comparative'
-    do_scalar = prompt_template.mode == 'scalar'
-    do_categorical = prompt_template.mode == 'categorical'
-
     if args.openai and not prompt_template.is_chat:
         logging.warning('WARNING: Given --openai, you\'re advised to use a chat-style prompt.')
     if 'instruct' in args.model.lower() and not prompt_template.is_chat:
         logging.warning('WARNING: Given "instruct" model, you\'re advised to use a chat-style prompt.')
 
     client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY')) if args.openai else None
-    model = MultipleChoiceModel(model_name=args.model, labels=prompt_template.labels_for_logits, prompt_start_for_cache=prompt_template.prompt_start_for_cache, client=client)
+    model = MultipleChoiceModel(model_name=args.model, labels=prompt_template.labels_for_logits, prompt_start_for_cache=prompt_template.prompt_start_for_cache, openai_client=client)
 
-    inputs = (line.strip() for line in args.file)
-
-    if do_comparative:
-        if args.compare_to:
-            compare_to = [line.strip() for line in args.compare_to]
-        else:
-            compare_to = inputs = list(inputs)
-        items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
-        add_results_to_dict = add_results_comparative
-    elif do_categorical:
-        items = iter_items_basic(inputs, prompt_template)
-        add_results_to_dict = functools.partial(add_results_categorical, category_names=list(prompt_template.categories))
-    else:
-        items = iter_items_basic(inputs, prompt_template)
-        add_results_to_dict = functools.partial(add_results_scalar, scale=prompt_template.scale)
+    match prompt_template.mode:
+        case 'comparative':
+            if args.compare_to:
+                compare_to = [line.strip() for line in args.compare_to]
+            else:
+                compare_to = inputs = list(inputs)
+            items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
+            add_results_to_dict = add_results_comparative
+        case 'categorical':
+            items = iter_items_basic(inputs, prompt_template)
+            add_results_to_dict = functools.partial(add_results_categorical, category_names=list(prompt_template.categories))
+        case 'scalar':
+            items = iter_items_basic(inputs, prompt_template)
+            add_results_to_dict = functools.partial(add_results_scalar, scale=prompt_template.scale)
 
     logging.info(f'-------\n{prompt_template}\n-------')
 
-    csv_writer = csv.DictWriter(sys.stdout, fieldnames=None)  # fieldnames determined on first iter...
+    csv_writer = DictWriterAutoHeader(sys.stdout)
     for item in items:
-
         scores = model.get_scores(item['prompt'])
         add_results_to_dict(item, scores)
         del item['prompt']
-
-        if not csv_writer.fieldnames:  # hmm
-            csv_writer.fieldnames = item.keys()
-            csv_writer.writeheader()
         csv_writer.writerow(item)
 
 
 def add_results_scalar(item: dict, scores: list[float], scale: list[int | float]):
     max_index = max(range(len(scores)), key=lambda x: scores[x])
+    scores = [round(s, N_DECIMALS) for s in scores]
     item['pred'] = scale[max_index]
-    item['prob'] = round(scores[max_index], N_DECIMALS)
+    item['prob'] = scores[max_index]
     item['rating'] = round(sum(s * n for s, n in zip(scores, scale)), N_DECIMALS)
-    item['probs'] = ';'.join(str(round(score, N_DECIMALS)) for score in scores)
+    item['probs'] = ';'.join(str(score) for score in scores)
 
 
 def add_results_comparative(item: dict, scores: list[float]):
     max_index = max(range(len(scores)), key=lambda x: scores[x])
+    scores = [round(s, N_DECIMALS) for s in scores]
     item['pred'] = item['choices'][max_index]
-    item['prob'] = round(scores[item['position']], N_DECIMALS)
-    item['probs'] = ';'.join(str(round(score, N_DECIMALS)) for score in scores)
+    item['prob'] = scores[item['position']]
+    item['probs'] = ';'.join(str(score) for score in scores)
     item['choices'] = ';'.join(item['choices'])  # hmm
 
 
 def add_results_categorical(item: dict, scores: list[float], category_names: list[str]):
     max_index = max(range(len(scores)), key=lambda x: scores[x])
+    scores = [round(s, N_DECIMALS) for s in scores]
     item['pred'] = category_names[max_index]
-    item['prob'] = round(scores[max_index], N_DECIMALS)
-    item['probs'] = ';'.join(str(round(score, N_DECIMALS)) for score in scores)
+    item['prob'] = scores[max_index]
+    item['probs'] = ';'.join(str(score) for score in scores)
 
 
 def iter_items_basic(lines: Iterable[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
@@ -152,9 +145,12 @@ def random_sample_not_containing(items: list, k: int, item_to_exclude) -> list:
     return sample
 
 
-def batched(iterable, n, *, strict=False):
-    # added to itertools only in 3.12, so included here
-    # batched('ABCDEFG', 3) → ABC DEF G
+def batched(iterable, n, *, strict=False) -> Generator[list, None, None]:
+    """
+    Was added to itertools only in Python 3.12, so included here.
+    >>> batched('ABCDEFG', 3)
+    ['A', 'B', 'C'], ['D', 'E', 'F'], ['G']
+    """
     if n < 1:
         raise ValueError('n must be at least one')
     iterator = iter(iterable)
@@ -162,6 +158,22 @@ def batched(iterable, n, *, strict=False):
         if strict and len(batch) != n:
             raise ValueError('batched(): incomplete batch')
         yield batch
+
+
+class DictWriterAutoHeader(csv.DictWriter):
+    """
+    A csv.DictWriter wrapper that lazily sets the fieldnames and writes the header automatically based
+    on the first writerow call.
+    """
+
+    def __init__(self, f):
+        super().__init__(f, fieldnames=[])
+
+    def writerow(self, rowdict):
+        if not self.fieldnames:
+            self.fieldnames.extend(rowdict.keys())
+            self.writeheader()
+        super().writerow(rowdict)
 
 
 if __name__ == '__main__':
