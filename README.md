@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install git+https://github.com/mwestera/choicellm
+pip install git+https://github.com/mwestera/choicellm.git@v0.2
 ```
 
 This tool lets you use both local LLMs (`transformers` library) and models through the OpenAI API (if you have an `OPENAI_API_KEY`).
