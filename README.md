@@ -2,6 +2,8 @@
 
 ## Installation
 
+**Note:** Consider installing (and reading the README of) the newer version, waiting in this other branch: https://github.com/mwestera/choicellm/tree/v0.2/
+
 ```bash
 pip install git+https://github.com/mwestera/choicellm
 ```
