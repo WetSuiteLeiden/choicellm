@@ -192,7 +192,7 @@ TEMPLATE_SCALAR = {
         {"item": "bat", "target_value": 1.0},
         {"item": "hope", "target_value": 0.0},
     ],
-    "_comment": "In the examples, \"value\" is the target rating as a float between [0, 1]. This will be automatically mapped to whichever scale is used. This facilitates trying different scales with the same examples."
+    "_comment": "In the examples, \"target_value\" is the target rating as a float between [0, 1]. This will be automatically mapped to whichever scale is used. This facilitates trying different scales with the same examples."
 }
 
 TEMPLATE_SCALAR_CHAT = TEMPLATE_SCALAR.copy()
