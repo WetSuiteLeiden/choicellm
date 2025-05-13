@@ -20,6 +20,7 @@ class MultipleChoiceModel:
 
         if openai_client:
             tokenizer = tiktoken.encoding_for_model(model_name)    # for o1, mind https://github.com/openai/tiktoken/issues/367
+            labels = [l.strip() for l in labels]    # Hmmmm strip spaces
             labels_tokenized = [tokenizer.encode(label) for label in labels]
             label_ids = [label_tokenized[0] for label_tokenized in labels_tokenized]
             # TODO: For o1 model, logprobs not supported; so consider disabling the logprobs and just getting the output directly?
