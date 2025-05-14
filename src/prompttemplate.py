@@ -8,6 +8,8 @@ import argparse
 
 
 # TODO: Drastic refactoring needed
+# TODO: Make fields in prompt template optional, i.e., not used if not present;
+# TODO: Add optional 'mid point' field to prompt template.
 
 class PromptTemplate:
 
