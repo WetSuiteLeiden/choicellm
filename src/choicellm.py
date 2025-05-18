@@ -19,10 +19,15 @@ N_DECIMALS = 6
 def main():
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('file', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+    argparser.add_argument('file', nargs='?', type=argparse.FileType('r'), default=sys.stdin, help='Plaintext file with one word/phrase per line. To allow newlines etc. within items, use .csv format with one (unnamed) column, and set the flag --csv. Alternatively, set the --newlines flag to specify newlines simply by \\n.')
+
+    input_options = argparser.add_mutually_exclusive_group()
+    input_options.add_argument('--csv', action='store_true', help='Use this if your file is in .csv format.')
+    input_options.add_argument('--newlines', action='store_true', help='Use this to replace \\n in the input file by proper newlines (i.e., if your items should contain newlines).')
+
     argparser.add_argument('--prompt', required=True, type=argparse.FileType('r'), default=None, help='.json file containing the prompt template, few-shot examples, etc. To generate a suitable template, first use the auxiliary command choicellm-template and adapt the template to your needs.')
 
-    argparser.add_argument('--seed', required=False, type=int, default=None, help='Only relevant for --mode comparative; will not affect LLM.')
+    argparser.add_argument('--seed', required=False, type=int, default=None, help='Only relevant for mode comparative; will not affect LLM.')
     argparser.add_argument('--model', required=False, type=str, default="unsloth/Llama-3.2-1B", help='Currently supports base models via transformers, and chat models through OpenAI (specify --openai in that case).')
     argparser.add_argument('--openai', action='store_true', help='Whether to use the OpenAI API; otherwise --model is assumed to be a local model via huggingface transformers.')
 
@@ -42,7 +47,13 @@ def main():
         random.seed(args.seed)
         logging.info(f'{args.seed=}')
 
-    inputs = (line.strip() for line in args.file)
+    if args.csv:
+        inputs = (l[0] for l in csv.reader(args.file))
+    elif args.newlines:
+        inputs = (line.strip().replace('\\n', '\n') for line in args.file)
+    else:
+        inputs = (line.strip() for line in args.file)
+
     prompt_template = PromptTemplate.from_json(args.prompt)
 
     if args.model == argparser.get_default('model'):
