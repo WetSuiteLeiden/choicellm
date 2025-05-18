@@ -41,6 +41,8 @@ def main():
 
     df = pandas.read_csv(args.file, index_col=None, converters=converters)
 
+    n_choices = len(df.iloc[0]['choices'])  # hmmm, expose as command line arg?
+
     if args.n_positions is not None or args.n_comparisons is not None:
         args.seed = args.seed or random.randint(0, 999999)
         logging.info(f'Seed: {args.seed}')
@@ -55,7 +57,8 @@ def main():
 
     df_agg_per_word = df.groupby(['target_id', 'target']).agg({'prob': 'mean', 'entropy': 'mean'})
 
-    df_agg_per_word['rating'] = df_agg_per_word['prob'] * (scale_end - scale_start) + scale_start
+    df_agg_per_word['rating'] = (df_agg_per_word['prob'] ** (1 / (n_choices - 1))) * (scale_end - scale_start) + scale_start
+    # rating based on normalized prob: if prob(winning 1 vs 3) = 0.25 = prob(winning 1 vs 1)**3, so prob(winning 1 vs 1) = 0.25 ** (1/3)
 
     df_agg_per_word['rating'] = df_agg_per_word['rating'].round(N_DECIMALS)
     df_agg_per_word['entropy'] = df_agg_per_word['entropy'].round(N_DECIMALS)
