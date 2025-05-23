@@ -54,7 +54,7 @@ def main():
     if args.n_comparisons is not None:
         df = df.set_index(['target_id', 'comparison_id']).pivot(columns=['position']).groupby('target_id').sample(args.n_comparisons).stack(level=1).reset_index()
 
-    df['entropy'] = [-sum(prob * math.log2(max(prob, 0.00000001)) for prob in scores) for scores in df['probs']]    # TODO: Hmmmmm
+    df['entropy'] = [-sum(prob * math.log2(max(prob, 0.00000001)) for prob in scores) for scores in df['probs']]    # Hmmmmm
 
     df_agg_per_word = df.groupby(['target_id', 'target']).agg({'prob': 'mean', 'entropy': 'mean'})
 
