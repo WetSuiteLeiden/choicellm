@@ -134,11 +134,6 @@ def iter_items_comparison(lines: Iterable[str], n_comparisons: int, all_position
     n_choices = prompt_template.n_choices
     n_alternatives = n_choices - 1
 
-    if len(compare_to) < n_comparisons + 1:
-        raise ValueError(
-            f'Not enough comparison items for {n_choices} × {n_comparisons} comparisons per item. '
-            f'Decrease n_choices or --n_comparisons, or provide a longer list of items to compare'
-            f'to (--compare_to).')
     logging.info(f'Will do {n_comparisons * (n_choices if all_positions else 1)} comparisons per input line.')
 
     for item_id, item in enumerate(lines):
@@ -155,11 +150,18 @@ def random_sample_not_containing(items: list, k: int, item_to_exclude) -> list:
     """
     Like random.sample(items, k), but excluding a specific element from the original. Original order not maintained.
     """
-    sample = random.sample(items, k=k + 1)  # one more just in case item is among them
+    sample = random.sample(items, k=min(k + 1, len(items)))  # one more if possible just in case item is among them
     try:
         sample.remove(item_to_exclude)
     except ValueError:  # if item not found
         sample.pop()
+
+    if len(sample) < k:
+        raise ValueError(
+            f'Not enough comparison items for n_choices × n_comparisons comparisons per item. '
+            f'Decrease n_choices or --n_comparisons, or provide a longer list of items to compare'
+            f'to (--compare_to).')
+
     return sample
 
 
