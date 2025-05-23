@@ -1,12 +1,22 @@
 # ChoiceLLM: A Python package for ratings and multiple choice answers from LLMs 
 
+## Purpose
+
+This tool makes it easier to prompt an LLM for:
+
+- 'scalar' judgments (e.g., "On a scale from 1 to 7, how abstract is this word?", "How suggestive is this question?").
+- 'comparative' judgments (e.g., "Of these 4 words, which is the most emotional?")
+- 'categorical' judgments, i.e., to classify words, phrases or paragraphs into a number of fixed, predetermined categories (e.g., "What type of speech act is this utterance?").
+
+and to do so for a large amount of 'stimuli', and using different LLMs (both locally running LLMs, and models via the OpenAI API, if you have an `OPENAI_API_KEY`).
+
+The scores obtained are deterministic, obtained by accessing the underlying logits computed by the model (as opposed to sampling a concrete response).
+
 ## Installation
 
 ```bash
 pip install git+https://github.com/mwestera/choicellm.git@v0.2
 ```
-
-This tool lets you use both local LLMs (`transformers` library) and models through the OpenAI API (if you have an `OPENAI_API_KEY`).
 
 Installation makes available the main program `choicellm`, and helper programs `choicellm-template` and `choicellm-aggregate`.
 
