@@ -8,14 +8,13 @@ from typing import Generator, Union, Iterable
 import os
 from openai import OpenAI
 import functools
+import io
 
 from prompttemplate import PromptTemplate
 from multichoicemodel import MultipleChoiceModel
 
 
 N_DECIMALS = 6
-
-# TODO: Allow comparative also by feeding it N-tuples as csv.
 
 
 def main():
@@ -50,10 +49,12 @@ def main():
         random.seed(args.seed)
         logging.info(f'{args.seed=}')
 
-    inputs = read_inputs(args.file, args.csv, args.newlines)
+    inputs, is_multicolumn = read_inputs(args.file, args.csv, args.newlines)
 
     prompt_template = PromptTemplate.from_json(args.prompt)
 
+    if is_multicolumn and prompt_template.mode != 'comparative':
+        raise ValueError('Input .csv appears to have multiple columns, which is an option only for \'comparative\' mode.')
     if args.model == argparser.get_default('model'):
         logging.warning(f'WARNING: Using default model {args.model}, which is quite small and may not yield very accurate results; use --model to override it.')
     if not args.openai and 'gpt4' in args.model:
@@ -72,12 +73,20 @@ def main():
 
     match prompt_template.mode:
         case 'comparative':
-            if args.compare_to:
-                compare_to = list(read_inputs(args.compare_to, args.csv, args.newlines))
+            if is_multicolumn:
+                if args.compare_to:
+                    logging.warning('WARNING: --compare_to is ignored, because input file is multi-column csv.')
+                items = ({'choices': choices, 'prompt': prompt_template.format(*choices)} for choices in inputs)
             else:
-                compare_to = inputs = list(inputs)
-            items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template,
-                                          compare_to=compare_to, seed_per_item=args.seed if args.compare_deterministic else None)
+                if args.compare_to:
+                    compare_to, is_multicolumn2 = read_inputs(args.compare_to, args.csv, args.newlines)
+                    if is_multicolumn2:
+                        raise ValueError('The --compare_to file appears to contain multiple .csv columns, which is not allowed.')
+                    compare_to = list(compare_to)
+                else:
+                    compare_to = inputs = list(inputs)
+                items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template,
+                                              compare_to=compare_to, seed_per_item=args.seed if args.compare_deterministic else None)
             add_results_to_dict = add_results_comparative
         case 'categorical':
             items = iter_items_basic(inputs, prompt_template)
@@ -96,14 +105,21 @@ def main():
         csv_writer.writerow(item)
 
 
-def read_inputs(file, is_csv, escaped_newlines) -> Generator[str, None, None]:
+def read_inputs(file, is_csv, escaped_newlines) -> tuple[Generator[Union[str, list[str]], None, None], bool]:
+    is_multicolumn = False
     if is_csv:
-        items = (l[0] for l in csv.reader(file))
+        rows = csv.reader(file)
+        first_item = next(rows)
+        if len(first_item) > 1:
+            is_multicolumn = True
+            items = itertools.chain([first_item], rows)
+        else:
+            items = itertools.chain([first_item[0]], (l[0] for l in rows))
     elif escaped_newlines:
         items = (line.strip().replace('\\n', '\n') for line in file)
     else:
         items = (line.strip() for line in file)
-    return items
+    return items, is_multicolumn
 
 
 def add_results_scalar(item: dict, probs: list[float], scale: list[int | float]):
@@ -112,7 +128,7 @@ def add_results_scalar(item: dict, probs: list[float], scale: list[int | float])
     item['pred'] = scale[max_index]
     item['prob'] = probs[max_index]
     item['rating'] = round(sum(s * n for s, n in zip(probs, scale)), N_DECIMALS)
-    item['probs'] = ';'.join(str(score) for score in probs)
+    item['probs'] = make_csv_string(probs, delimiter=';')
 
 
 def add_results_comparative(item: dict, probs: list[float]):
@@ -121,8 +137,8 @@ def add_results_comparative(item: dict, probs: list[float]):
     item['pred'] = item['choices'][max_index]
     if 'position' in item:
         item['prob'] = probs[item['position']]
-    item['probs'] = ';'.join(str(score) for score in probs)
-    item['choices'] = ';'.join(item['choices'])  # hmm
+    item['probs'] = make_csv_string(probs, delimiter=';')
+    item['choices'] = make_csv_string(item['choices'], delimiter=';')
 
 
 def add_results_categorical(item: dict, probs: list[float], category_names: list[str]):
@@ -130,7 +146,7 @@ def add_results_categorical(item: dict, probs: list[float], category_names: list
     probs = [round(s, N_DECIMALS) for s in probs]
     item['pred'] = category_names[max_index]
     item['prob'] = probs[max_index]
-    item['probs'] = ';'.join(str(score) for score in probs)
+    item['probs'] = make_csv_string(probs, delimiter=';')
 
 
 def iter_items_basic(lines: Iterable[str], prompt_template: Union[str, PromptTemplate]) -> Generator[dict, None, None]:
@@ -211,6 +227,14 @@ class DictWriterAutoHeader(csv.DictWriter):
             self.fieldnames.extend(rowdict.keys())
             self.writeheader()
         super().writerow(rowdict)
+
+
+def make_csv_string(row: list, delimiter=','):
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=delimiter)
+    writer.writerow(row)
+    csv_string = output.getvalue().strip()
+    return csv_string
 
 
 if __name__ == '__main__':
