@@ -26,24 +26,25 @@ def main():
                                 'Set the --csv flag to allow inputs in .csv format with one column and no header. '
                                 'For comparative mode, the csv input can also have n_choices columns.')
 
-    input_options = argparser.add_mutually_exclusive_group()
-    input_options.add_argument('--csv', action='store_true', help='Use this if your file is in .csv format.')
-    input_options.add_argument('--newlines', action='store_true', help='Use this to replace \\n in the input file by proper newlines (i.e., if your items should contain newlines).')
-
     argparser.add_argument('--prompt', required=True, type=argparse.FileType('r'), default=None, help='.json file containing the prompt template, few-shot examples, etc. To generate a suitable template, first use the auxiliary command choicellm-template and adapt the template to your needs.')
-
-    argparser.add_argument('--seed', required=False, type=int, default=None, help='Only relevant for mode comparative; will not affect LLM.')
     argparser.add_argument('--model', required=False, type=str, default="unsloth/Llama-3.2-1B", help='Currently supports base models via transformers, and chat models through OpenAI (specify --openai in that case).')
-    argparser.add_argument('--openai', action='store_true', help='Whether to use the OpenAI API; otherwise --model is assumed to be a local model via huggingface transformers.')
+    argparser.add_argument('--openai', action='store_true', help='Set this flag for models through the OpenAI API; otherwise --model is assumed to be a local model via huggingface transformers.')
+
+    input_options = argparser.add_argument_group('flags to change input format')
+    input_options_excl = input_options.add_mutually_exclusive_group()
+    input_options_excl.add_argument('--csv', action='store_true', help='Set this flag if your input file is in .csv format, either a single column to allow newlines etc., or multiple columns (optionally) for comparative mode.')
+    input_options_excl.add_argument('--newlines', action='store_true', help='If you want your input file to include newlines, either use full, proper .csv format (and the --csv flag), or use this flag to simply replace occurrences of "\\n" in the input file by proper newlines.')
 
     # TODO low-priority implement this, maybe replacing --all_positions
-    argparser.add_argument('--n_orders', type=int, help='[not implemented yet] Whether to randomize the order of the categories, and if so, how often; -1 means all orders.', default=None)
+    # argparser.add_argument('--n_orders', type=int, help='[not implemented yet] Whether to randomize the order of the categories, and if so, how often; -1 means all orders.', default=None)
 
     # If --mode comparative:
-    argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if comparative; file containing the words to compare against. Default is the main file argument itself. If --csv, then --compare_to must be a csv file as well.')
-    argparser.add_argument('--compare_deterministic', required=False, action='store_true', help='Only if comparative; to make selection of alternatives deterministic; if --compare_to is given (and no overlap with items), this will result in the exact same comparisons per item.')
-    argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if comparative and comparisons not predetermined in csv inout.')
-    argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if comparative.')
+    comparative_group = argparser.add_argument_group('options for comparative mode (only if comparisons not predetermined in .csv input)')
+    comparative_group.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='File containing the words to compare against. Default is the main file argument itself. If --csv, then --compare_to must be a csv file as well.')
+    comparative_group.add_argument('--compare_deterministic', required=False, action='store_true', help='To make selection of alternatives deterministic; if --compare_to is given (and no overlap with items), this will result in the exact same comparisons per item.')
+    comparative_group.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus.')
+    comparative_group.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if comparative.')
+    comparative_group.add_argument('--seed', required=False, type=int, default=None, help='Seed to use for shuffling/sampling of comparisons. By default a random seed is picked. If --compare_deterministic, this seed is reused for each item\'s comparisons.')
 
     args = argparser.parse_args()
 
