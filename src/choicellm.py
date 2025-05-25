@@ -20,7 +20,11 @@ N_DECIMALS = 6
 def main():
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('file', nargs='?', type=argparse.FileType('r'), default=sys.stdin, help='Plaintext file with one word/phrase per line. To allow newlines etc. within items, use .csv format with one (unnamed) column, and set the flag --csv. Alternatively, set the --newlines flag to specify newlines simply by \\n.')
+    argparser.add_argument('file', nargs='?', type=argparse.FileType('r'), default=sys.stdin,
+                           help='Plaintext file with one word/phrase per line. '
+                                'Set the --newlines flag to allow the inclusion of "\\n" to indicate newlines within items. '
+                                'Set the --csv flag to allow inputs in .csv format with one column and no header. '
+                                'For comparative mode, the csv input can also have n_choices columns.')
 
     input_options = argparser.add_mutually_exclusive_group()
     input_options.add_argument('--csv', action='store_true', help='Use this if your file is in .csv format.')
