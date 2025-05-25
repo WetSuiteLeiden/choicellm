@@ -15,6 +15,8 @@ from multichoicemodel import MultipleChoiceModel
 
 N_DECIMALS = 6
 
+# TODO: Allow comparative also by feeding it N-tuples as csv.
+
 
 def main():
 
@@ -36,7 +38,8 @@ def main():
 
     # If --mode comparative:
     argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if comparative; file containing the words to compare against. Default is the main file argument itself.')
-    argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if comparative.')
+    argparser.add_argument('--compare_deterministic', required=False, action='store_true', help='Only if comparative; to make selection of alternatives deterministic; if --compare_to is given (and no overlap with items), this will result in the exact same comparisons per item.')
+    argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if comparative and comparisons not predetermined in csv inout.')
     argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if comparative.')
 
     args = argparser.parse_args()
@@ -78,7 +81,8 @@ def main():
                 compare_to = [line.strip() for line in args.compare_to]
             else:
                 compare_to = inputs = list(inputs)
-            items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template, compare_to=compare_to)
+            items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template,
+                                          compare_to=compare_to, seed_per_item=args.seed if args.compare_deterministic else None)
             add_results_to_dict = add_results_comparative
         case 'categorical':
             items = iter_items_basic(inputs, prompt_template)
@@ -129,15 +133,22 @@ def iter_items_basic(lines: Iterable[str], prompt_template: Union[str, PromptTem
         yield {'target_id': n, 'target': line, 'prompt': prompt}
 
 
-def iter_items_comparison(lines: Iterable[str], n_comparisons: int, all_positions: bool, prompt_template: Union[str, PromptTemplate], compare_to: list[str]) -> Generator[dict, None, None]:
+def iter_items_comparison(items: Iterable[str], n_comparisons: int, all_positions: bool,
+                          prompt_template: Union[str, PromptTemplate], compare_to: list[str],
+                          seed_per_item: int) -> Generator[dict, None, None]:
 
     n_choices = prompt_template.n_choices
     n_alternatives = n_choices - 1
 
     logging.info(f'Will do {n_comparisons * (n_choices if all_positions else 1)} comparisons per input line.')
 
-    for item_id, item in enumerate(lines):
+    for item_id, item in enumerate(items):
+
+        if seed_per_item is not None:
+            random.seed(seed_per_item)
+
         all_alternatives = random_sample_not_containing(compare_to, n_comparisons * n_alternatives, item_to_exclude=item)
+
         for comp_id, alternatives in enumerate(batched(all_alternatives, n_alternatives)):
             positions = range(n_choices) if all_positions else [random.randint(0, n_alternatives)]
             for pos in positions:
@@ -159,7 +170,7 @@ def random_sample_not_containing(items: list, k: int, item_to_exclude) -> list:
     if len(sample) < k:
         raise ValueError(
             f'Not enough comparison items for n_choices × n_comparisons comparisons per item. '
-            f'Decrease n_choices or --n_comparisons, or provide a longer list of items to compare'
+            f'Decrease n_choices or --n_comparisons, or provide a longer list of items to compare '
             f'to (--compare_to).')
 
     return sample
