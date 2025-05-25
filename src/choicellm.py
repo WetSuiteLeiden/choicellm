@@ -37,7 +37,7 @@ def main():
     argparser.add_argument('--n_orders', type=int, help='[not implemented yet] Whether to randomize the order of the categories, and if so, how often; -1 means all orders.', default=None)
 
     # If --mode comparative:
-    argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if comparative; file containing the words to compare against. Default is the main file argument itself.')
+    argparser.add_argument('--compare_to', required=False, type=argparse.FileType('r'), default=None, help='Only if comparative; file containing the words to compare against. Default is the main file argument itself. If --csv, then --compare_to must be a csv file as well.')
     argparser.add_argument('--compare_deterministic', required=False, action='store_true', help='Only if comparative; to make selection of alternatives deterministic; if --compare_to is given (and no overlap with items), this will result in the exact same comparisons per item.')
     argparser.add_argument('--n_comparisons', required=False, type=int, default=100, help='Comparisons per stimulus; only if comparative and comparisons not predetermined in csv inout.')
     argparser.add_argument('--all_positions', action='store_true', help='Whether to average over all positions; only if comparative.')
@@ -50,12 +50,7 @@ def main():
         random.seed(args.seed)
         logging.info(f'{args.seed=}')
 
-    if args.csv:
-        inputs = (l[0] for l in csv.reader(args.file))
-    elif args.newlines:
-        inputs = (line.strip().replace('\\n', '\n') for line in args.file)
-    else:
-        inputs = (line.strip() for line in args.file)
+    inputs = read_inputs(args.file, args.csv, args.newlines)
 
     prompt_template = PromptTemplate.from_json(args.prompt)
 
@@ -78,7 +73,7 @@ def main():
     match prompt_template.mode:
         case 'comparative':
             if args.compare_to:
-                compare_to = [line.strip() for line in args.compare_to]
+                compare_to = list(read_inputs(args.compare_to, args.csv, args.newlines))
             else:
                 compare_to = inputs = list(inputs)
             items = iter_items_comparison(inputs, args.n_comparisons, args.all_positions, prompt_template,
@@ -101,6 +96,16 @@ def main():
         csv_writer.writerow(item)
 
 
+def read_inputs(file, is_csv, escaped_newlines) -> Generator[str, None, None]:
+    if is_csv:
+        items = (l[0] for l in csv.reader(file))
+    elif escaped_newlines:
+        items = (line.strip().replace('\\n', '\n') for line in file)
+    else:
+        items = (line.strip() for line in file)
+    return items
+
+
 def add_results_scalar(item: dict, probs: list[float], scale: list[int | float]):
     max_index = max(range(len(probs)), key=lambda x: probs[x])
     probs = [round(s, N_DECIMALS) for s in probs]
@@ -114,7 +119,8 @@ def add_results_comparative(item: dict, probs: list[float]):
     max_index = max(range(len(probs)), key=lambda x: probs[x])
     probs = [round(s, N_DECIMALS) for s in probs]
     item['pred'] = item['choices'][max_index]
-    item['prob'] = probs[item['position']]
+    if 'position' in item:
+        item['prob'] = probs[item['position']]
     item['probs'] = ';'.join(str(score) for score in probs)
     item['choices'] = ';'.join(item['choices'])  # hmm
 
