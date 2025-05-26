@@ -192,7 +192,8 @@ def random_sample_not_containing(items: list, k: int, item_to_exclude) -> list:
     try:
         sample.remove(item_to_exclude)
     except ValueError:  # if item not found
-        sample.pop()
+        if len(sample) > k:
+            sample.pop()
 
     if len(sample) < k:
         raise ValueError(
