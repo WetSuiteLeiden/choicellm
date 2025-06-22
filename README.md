@@ -20,12 +20,6 @@ From PyPI:
 pip install choicellm
 ```
 
-Or the latest version directly from GitHub:
-
-```bash
-pip install git+https://github.com/mwestera/choicellm.git@v0.2
-```
-
 Installation makes available the main program `choicellm`, and helper programs `choicellm-template` and `choicellm-aggregate`.
 
 ## First create a suitable prompt JSON file (`choicellm-template`)
