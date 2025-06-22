@@ -16,14 +16,15 @@ class MultipleChoiceModel:
     Its main role is to extract the computed logits to obtain probabilities for the multiple choices.
     """
 
-    def __init__(self, model_name, labels, model_is_chat, prompt_start_for_cache=None, client=None):
+    def __init__(self, model_name, labels, prompt_start_for_cache=None, openai_client=None):
 
-        if client and model_is_chat:    # assuming openai gpt
-            tokenizer = tiktoken.encoding_for_model('gpt-4o' if model_name.startswith('o1') else model_name)    # TODO meh
+        if openai_client:
+            tokenizer = tiktoken.encoding_for_model(model_name)    # for o1, mind https://github.com/openai/tiktoken/issues/367
+            labels = [l.strip() for l in labels]    # Hmmmm strip spaces
             labels_tokenized = [tokenizer.encode(label) for label in labels]
             label_ids = [label_tokenized[0] for label_tokenized in labels_tokenized]
             # TODO: For o1 model, logprobs not supported; so consider disabling the logprobs and just getting the output directly?
-            self.get_scores = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=client, labels=labels, label_ids=label_ids)
+            self.get_probs = functools.partial(self.get_multiple_choice_prob_openai, model_name=model_name, client=openai_client, labels=labels, label_ids=label_ids)
 
             problematic_labels = [label for label, label_tokenized in zip(labels, labels_tokenized) if len(label_tokenized) != 1]
             if problematic_labels:
@@ -32,16 +33,16 @@ class MultipleChoiceModel:
 
         else:  # assuming local transformers model
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=False)
-            labels_tokenized = [tokenizer.encode(label if model_is_chat else ' ' + label, add_special_tokens=False) for label in labels]
+            labels_tokenized = [tokenizer.encode(label, add_special_tokens=False) for label in labels]
             model = transformers.AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
             model.eval()
 
             cached_common_start = create_cache(model, tokenizer, prompt_start_for_cache) if prompt_start_for_cache else None
-            self.get_scores = functools.partial(self.get_multiple_choice_prob,
-                                                model=model,
-                                                tokenizer=tokenizer,
-                                                labels_tokenized=labels_tokenized,
-                                                cache=cached_common_start)
+            self.get_probs = functools.partial(self.get_multiple_choice_prob,
+                                               model=model,
+                                               tokenizer=tokenizer,
+                                               labels_tokenized=labels_tokenized,
+                                               cache=cached_common_start)
 
 
     def get_scores(self, prompt: Union[str, list[str]]) -> list[float]:

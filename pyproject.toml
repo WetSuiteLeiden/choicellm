@@ -4,17 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "choicellm"
-version = "0.1"
+version = "0.2"
 authors = [{name="Matthijs Westera", email="m.westera@hum.leidenuniv.nl"}]
-description = "Using LLMs for rating items on a scale, comparative judgments, and multiple choice categorization."
+description = "Using LLMs for rating items on a scale, comparative judgments, and multiple choice questions."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["transformers", "torch", "accelerate", "optimum", "auto_gptq", "bitsandbytes", "openai", "tqdm", "python-dotenv", "tiktoken", "pandas"]
+dependencies = ["transformers", "torch", "accelerate", "optimum", "auto_gptq", "bitsandbytes", "openai", "tiktoken", "pandas"]
 
 
 [project.scripts]
 choicellm = "choicellm:main"
-choicellm_aggregate = "aggregate:main"
+choicellm-aggregate = "aggregate:main"
+choicellm-template = "prompttemplate:main"
 
 [project.urls]
 "Homepage" = "https://github.com/mwestera/choicellm"

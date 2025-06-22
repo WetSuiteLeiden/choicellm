@@ -1,115 +1,104 @@
-# ChoiceLLM: A Python package for rating/multiple choice prompting 
+# ChoiceLLM: A Python package for ratings and multiple choice answers from LLMs 
+
+## Purpose
+
+This tool makes it easier to prompt an LLM for:
+
+- 'scalar' judgments (e.g., "On a scale from 1 to 7, how abstract is this word?", "How suggestive is this question?").
+- 'comparative' judgments (e.g., "Of these 4 words, which is the most emotional?")
+- 'categorical' judgments, i.e., to classify words, phrases or paragraphs into a number of fixed, predetermined categories (e.g., "What type of speech act is this utterance?").
+
+and to do so for a large amount of 'stimuli', and using different LLMs (both locally running LLMs, and models via the OpenAI API, if you have an `OPENAI_API_KEY`).
+
+The scores obtained are deterministic, obtained by accessing the underlying logits computed by the model (as opposed to sampling a concrete response).
 
 ## Installation
 
-**NEWER VERSION:** Consider installing (and reading the README of) the newer version, waiting in this other branch: https://github.com/mwestera/choicellm/tree/v0.2/
+From PyPI:
 
 ```bash
-pip install git+https://github.com/mwestera/choicellm
+pip install choicellm
 ```
 
-This tool lets you use local LLMs (`transformers` library). It also supports models through the OpenAI API, in which case you need to set the `OPENAI_API_KEY` environment variable to your secret key:
+Or the latest version directly from GitHub:
+
+```bash
+pip install git+https://github.com/mwestera/choicellm.git@v0.2
+```
+
+Installation makes available the main program `choicellm`, and helper programs `choicellm-template` and `choicellm-aggregate`.
+
+## First create a suitable prompt JSON file (`choicellm-template`)
+
+When running `choicellm`, you need to provide it with a 'prompt template' file in JSON format, like `choicellm --prompt my_first_prompt.json`. The exact format of this file will depend on what you want to use `choicellm` for, i.e., for scalar judgments (and if so, on what kind of scale), for multiple-choice questions, or for comparing items, and whether you plan to use a 'base' model (i.e., plain language generation) or an 'instruct' model (i.e., chatbot like GPT).
+
+To generate an example prompt template (which you can then modify to suit your needs), you can do, for instance:
+
+```bash
+choicellm-template --scalar > my_first_prompt.json
+```
+
+Alternative modes are `--comparative` and `--categorical` (see below for some explanation, but you'll understand most from the generated prompt templates themselves). If you want to use an 'instruct' model, additionally specify `--chat`. (Note that the examples were written for a study on concreteness vs. abstractness; you can of course modify all of this.)
+
+When modifying a prompt, make sure to use all the parts in curly braces, like `{scale}`. These will be replaced by the program, according to the information you provide.
+
+The prompt templates contain some additional comments under the JSON key `_comments`.
+
+## Basic usage
+
+Now, assuming you have some items (words, phrases) to be categorized (or whatever) in a plain text file `items.txt`, one on each line, you can now do:
+
+```bash
+choicellm items.txt --prompt my_first_prompt.json
+```
+
+Results will simply be printed to the command-line (along with some logging info). To save them, use output redirection:
+
+```bash
+choicellm items.txt --prompt my_first_prompt.json > results.csv
+```
+
+The default model won't be very big, or very good. If you have a more powerful computer, you could try something larger with the `--model` option, accepting any model identifier from the Huggingface hub.
+
+```bash
+choicellm items.txt --model 'unsloth/llama-3-70b-bnb-4bit' --prompt my_first_prompt.json > results.csv
+```
+
+To use a proprietary OpenAI model, first, you need to set the `OPENAI_API_KEY` environment variable to your secret key:
 
 ```bash
 export OPENAI_API_KEY=yoursecretkey123
 ```
 
-Or, alternatively, add a file `.env` in your working directory containing your OpenAI API key like this:
-
-```
-OPENAI_API_KEY=yoursecretkey123
-```
-
-Installation makes available the command `choicellm`, and a helper program `choicellm_aggregate`
-
-## Basic usage
-
-The main command `choicellm` takes a plaintext file as argument and some options.
-
-A minimal way of running the command is as follows:
+Then you can specify an OpenAI model (and include the `--openai` flag):
 
 ```bash
-choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode scalar > results.csv
+choicellm items.txt --model 'gpt-4o' --openai --my_first_prompt.json > results.csv
 ```
 
-This asks the specified language model (from Huggingface) to rate all the items in `items.txt` (one per line) on a scale from 1-5 representing levels of 'concreteness': how concrete (vs. abstract) is a given word or phrase.
+Since GPT-4o is an 'instruct' (i.e., chat) model, make sure you use it with a prompt template created with the `--chat` option, e.g., `choicellm-template --scalar --chat`.
 
-Instead of asking the model to rate items on a scale (`--mode scalar`), we can ask it to choose one of several categories: `--mode categorical`. In this case, the default behavior (see below how to specify custom prompts) is for the model to choose, for each item, between 'concrete', 'neutral' and 'abstract'.
+On the whole, while `choicellm` is probably not entirely model-agnostic in some unforeseen ways, it should work with Huggingface models and OpenAI models. Reasonable local options that fit in a 48GB GPU: `unsloth/llama-3-70b-bnb-4bit` or `unsloth/Llama-3.3-70B-Instruct-bnb-4bit`. Since the latter is an 'instruct' model, again make sure to use a prompt template generated with the `--chat` option.
+
+## A bit more info about the three 'modes': scalar, comparative, categorical
+
+First, `--scalar` prompts ask the LLM to give ratings on a numerical scale. Beware that negative scale values (like a scale -1, 0, 1, which could make sense for sentiment) are currently supported only for local models with `transformers`, not through the OpenAI client. (This applies more generally to labels that do not map onto single token ids for the given tokenizer.) The `results.csv` file contains the items, with additional columns `pred` (the model's choice), `prob` (the probability the model assigned to this choice, i.e., the softmaxed logits), `rating` (a weighted sum taking the model's probabilities for all choices into account), `probs` (the probabilities for all choices, separated by semicolons; these sum to 1.0). 
+
+Next, `--categorical` prompts are most suited for single-label categorization: the category probabilities sum to one (under the hood, the LLM is not given the option of listing several categories). (For multi-label categorization, see below.) For this mode, the `results.csv` file contains `pred` (the 'chosen' category), `prob` (its probability) and `probs` (probabilities for all categories, separated by semicolons).
+
+Third, `--comparative` prompts ask the model to compare each item to a large number of random other items, which can result in more reliable per-item scores (once aggregated over all comparisons). Applying `choicellm` to such a prompt comes with some additional options, see `choicellm --help` for that. (Publication with more explanation pending.) Note that, for a `--comparative` prompt, the `results.csv` file will not contain a single score per item, but rather a separate row for each of the many comparisons it did. The auxiliary command `choicellm-aggregate` may be used to aggregate these comparisons into a single score per item (in this case resulting in values on the scale 1,5):
 
 ```bash
-choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode categorical > results.csv
+choicellm-aggregate results.csv --scale 1,5 > results_aggregated.csv
 ```
 
-Note that `--mode categorical` is most suited for single-label categorization: the category probabilities sum to one (under the hood, the LLM is not given the option of listing several categories). See **Multi-label classification** below for instructions how to best achieve this.
-
-Finally, we can set `--mode comparative` to ask the model to compare each item to a large number of random other items, which can result in more reliable per-item scores (once aggregated over all comparisons).
-
-```bash
-choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --mode comparative > results.csv
-```
-
-In this case, the `results.csv` file will not contain a single score per item, but rather a separate row for each comparison it did. The auxiliary command `choicellm_aggregate` may be used to aggregate these comparisons into a single score per item (in this case resulting in values on the scale 1,5):
-
-```bash
-choicellm_aggregate results.csv --scale 1,5 > results_aggregated.csv
-```
-
-To see some other options with rather minimal explanations, do `choicellm --help`. To illustrate some of those, to prompt OpenAI's `gpt-4o` for concreteness scores in `comparative` mode, you could do (and don't forget to aggregate the results afterwards with `choicellm_aggregate`):
-
-```bash
-choicellm items.txt --model "gpt-4o" --openai --labels A B C --n_choices 3 --n_comparisons 50 --mode comparative > results.csv
-```
-
-(Though for a chat model like `gpt-4o`, as opposed to a base model like `unsloth/llama-3-70b-bnb-4bit`, it might be better to use a custom prompt, see below.)
-
-It might be useful to save raw model outputs by redirecting the error stream by appending `2> raw_output.log`, though this will (currently) contain some noise from the progress bar.
-
-## Custom prompts
-
-One of the options is `--prompt`, which lets you specify a `.json` file containing system prompt, prompt template and few-shot examples. If you don't specify a `--prompt` file, the program will use a default prompt. The default prompts were designed for getting _concreteness_ judgments from the LLM (just as an example).
-
-The default prompt, and also the elements of a `.json` file for a custom prompt, depends on the mode (`--mode`): it differs slightly for getting scalar judgements, comparisons and multiple-choice categorization. You can find the default prompts in `src/prompttemplate.py`. To create a custom prompt, it is easiest to copy one of these templates into a new `.json` file and then modify it. 
-
-An example with a custom prompt (say, for sentiment analysis) would be as follows -- assuming you have the relevant prompt specification in a file `sentiment.json`: 
-
-```bash
-choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --mode scalar > results.csv
-```
-
-You can also specify which scale to use, with `--labels`, as follows. Since this is a three-point scale, your few-shot examples in the `.json` specification of the prompt should use 0 as minimum and 2 as maximum response value.
-
-```bash
-choicellm items.txt --model "unsloth/llama-3-70b-bnb-4bit" --prompt sentiment.json --labels -1 0 1 --mode scalar > results.csv
-```
-
-Beware that negative scale values (like a scale -1, 0, 1) are currently supported only for local models with `transformers`, not through the OpenAI client. (This applies more generally to labels that do not map onto single token ids for the given tokenizer.)
-
-## Multi-label classification
-
-As mentioned, `--mode categorical` is suited for single-label classification, as the model is forced to choose _one_ out of several categories. To achieve _multi-label_ classification (where the same instance may fit several categories at once), the recommended approach is to implement this as multiple, separate `--mode scalar` runs, one for each category. This can be easily achieved in Bash by looping over the categories as follows:
+Lastly, to achieve _multi-label_ classification (where the same instance may fit several categories at once), the recommended approach is to implement this as multiple, separate `--scalar` (or `--comparative`) prompts, one for each category, and fed separately into `choicellm`. After creating separate prompt files (each named as `<category>.json`), feeding them into `choicellm` can be easily done in Bash by looping over the prompt files as follows (e.g.):
 
 ```bash
 for category in games movies music sports; do
-    cat items.txt | choicellm --model 'unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit' --chat --mode scalar --prompt "$category.json" > "$category.csv"
+    choicellm items.txt --model 'unsloth/Meta-Llama-3.1-70B-Instruct-bnb-4bit' --prompt "$category.json" > "$category.csv"
 done
 ```
 
-This requires a separate `.json` prompt file for each category (each with its own system prompt, and few-shot examples specific to that category) -- which is probably a good idea regardless, as it encourages fine-tuning and evaluating the prompt for each category separately. The `.csv` results files (one per category) need to be merged afterward, which is fairly straightforward using (for instance) the `pandas` library. 
-
-
-## Which models to use?
-
-While probably not entirely model-agnostic in some unforeseen ways, it should work with most Huggingface models and OpenAI models. Here are some models that work: 
-
-- Reasonable local options that fit in a 48GB GPU: `unsloth/llama-3-70b-bnb-4bit` or (chat model) `unsloth/Llama-3.3-70B-Instruct-bnb-4bit` (in the latter case, include option `--chat`)
-- If you want to use the OpenAI API, you can use their models, e.g., `--model gpt-4o --openai`
-- For debugging you could use `xiaodongguaAIGC/llama-3-debug` that is like llama3 but tiny and basically random outputs. 
-
-Note that the default prompts were designed for base models, not instruct/chat models. You can specify the option `--chat` to make sure prompts are submitted in the OpenAI chat format (list of messages). When using a chat model, you may want to manually change the prompt formulation a bit, e.g., use the second-person ('you') perspective to instruct the model, and a question mark instead of a colon. These things are not automatically changed.
-
-Here's an example that asks `gpt-4o` to assign to each plaintext headline (say) from `headlines.txt` the most applicable topic (from some predefined list given in the custom prompt `topics.json`, assuming it exists). 
-
-```bash
-choicellm headlines.txt --model "gpt-4o" --openai --prompt topics.json --mode categorical > results.csv 2> raw_llm_output.log
-```
+Having a separate prompt template per category (with designated system prompt and few-shot examples for each category) is probably a good idea regardless, as it encourages fine-tuning and evaluating the system for each category separately. The `.csv` results files (one per category) need to be merged afterward, which is fairly straightforward using (for instance) the `pandas` library. 
 
