@@ -83,7 +83,7 @@ class PromptTemplate:
         if "chat" not in prompt_info:
             logging.warning(
                 f'WARNING: The prompt .json file does not specify whether to use chat-style prompting; assuming "chat": false')
-            prompt_kwargs['chat'] = False
+            prompt_info['chat'] = False
 
         prompt_info['is_chat'] = prompt_info.pop('chat')
 
