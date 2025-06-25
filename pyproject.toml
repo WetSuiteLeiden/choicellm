@@ -1,6 +1,6 @@
 [project]
 name = "choicellm"
-version = "0.3.0"
+version = "0.2.1"
 authors = [{name="Matthijs Westera", email="m.westera@hum.leidenuniv.nl"}]
 description = "Using LLMs for rating items on a scale, comparative judgments, and multiple choice questions."
 readme = "README.md"
