@@ -13,7 +13,7 @@ classifiers = [
     "Topic :: Text Processing :: Linguistic",
 ]
 requires-python = ">=3.10"
-dependencies = ["transformers", "torch", "accelerate", "optimum", "auto_gptq", "bitsandbytes", "openai", "tiktoken", "pandas"]
+dependencies = ["transformers", "torch", "accelerate", "optimum", "bitsandbytes", "openai", "tiktoken", "pandas"]
 license-files = ["LICENSE"]
 
 [project.scripts]
