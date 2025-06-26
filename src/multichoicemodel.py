@@ -34,7 +34,7 @@ class MultipleChoiceModel:
         else:  # assuming local transformers model
             tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, clean_up_tokenization_spaces=False)
             labels_tokenized = [tokenizer.encode(label, add_special_tokens=False) for label in labels]
-            model = transformers.AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)
+            model = transformers.AutoModelForCausalLM.from_pretrained(model_name).to(DEVICE)    # TODO: This crashes with 8bit models.
             model.eval()
 
             cached_common_start = create_cache(model, tokenizer, prompt_start_for_cache) if prompt_start_for_cache else None
