@@ -84,7 +84,7 @@ class MultipleChoiceModel:
                 output_logits=True,
                 return_dict_in_generate=True,
                 do_sample=False,
-                max_new_tokens=1,
+                max_new_tokens=5, # just in case...
                 past_key_values=copy.deepcopy(cache) if cache else None,
                 temperature=None,  # only to avoid a warning
                 top_p=None
