@@ -203,7 +203,7 @@ TEMPLATE_SCALAR_CHAT.update({
     'system_prompt': 'Some words and phrases are more concrete, some are more abstract. You are a helpful assistant, '
                      'who is an expert on rating how *concrete* a given word or phrase is, as a rating on a scale '
                      '{scale}, with {scale_min} very abstract, and {scale_max} very concrete.',
-    'prompt_format': '## Question {n}.\n\nWord/phrase: {item}\n\nHow concrete is this {label_hint}?',
+    'prompt_format': '## Question {n}.\n\nWord/phrase: {item}\n\nHow concrete is this{label_hint}?',
 })
 
 TEMPLATE_COMPARATIVE = {
