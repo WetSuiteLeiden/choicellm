@@ -7,7 +7,7 @@
         "https://w3id.org/research-technology-readiness-levels"
     ],
     "@id": "https://pypi.org/project/choicellm/",
-    "@type": "CommandLineApplication",
+    "@type": "SoftwareSourceCode",
     "identifier": "choicellm",
     "name": "ChoiceLLM",
     "description": "Python command-line tool to use LLMs for rating items on a scale, comparative judgments, and multiple choice questions",
@@ -23,6 +23,23 @@
       "https://w3id.org/nwo-research-fields#ComputersAndTheHumanities",
       "https://w3id.org/nwo-research-fields#TextualAndContentAnalysis"
     ],
+    "isSourceCodeOf": [
+        {
+            "@type": "CommandLineApplication",
+            "name": "ChoiceLLM",
+            "executableName": "choicellm"
+        },
+        {
+            "@type": "CommandLineApplication",
+            "name": "ChoiceLLM Aggregate",
+            "executableName": "choicellm-aggregate"
+        },
+        {
+            "@type": "CommandLineApplication",
+            "name": "ChoiceLLM Template",
+            "executableName": "choicellm-template"
+        }
+     ],
     "author": {
         "@type": "Person",
         "givenName": "Matthijs",
